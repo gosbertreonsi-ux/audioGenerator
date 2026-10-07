@@ -146,7 +146,7 @@ export interface VocalModel {
   popularityScore: number;
 }
 
-export type StemMode = 'full' | 'words_only' | 'beat_only' | 'swapped_instrumental';
+export type StemMode = 'full' | 'words_only' | 'beat_only' | 'words_muted' | 'swapped_instrumental';
 
 export interface InstrumentalSwapOption {
   id: string;

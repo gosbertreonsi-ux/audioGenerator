@@ -51,11 +51,11 @@ export class MusicAudioEngine {
 
   // Active settings
   private currentSettings: TransformationPreset = {
-    id: 'papaoutai_afro_remix',
-    name: 'Papaoutai -> Afrobeat Viral Remix',
+    id: 'viral_afro_fusion',
+    name: 'Afrobeat Style Shifter (Lagos Groove)',
     category: 'Remix & Swap',
-    badge: 'VIRAL AFRO HIT',
-    description: 'Isolates original vocal words, mutes electro-pop beat, and drops syncopated 114 BPM Lagos Afrobeat groove with brass horns.',
+    badge: 'AFROBEAT HIT',
+    description: 'Mutes original drum beat, isolates vocal words, and layers authentic 114 BPM Lagos Afrobeat groove with brass horns and syncopation.',
     speed: 1.0,
     pitch: 0,
     reverbWet: 0.28,
@@ -172,27 +172,73 @@ export class MusicAudioEngine {
     return { ...this.stemMixLevels };
   }
 
+  // Mute Original Words (Karaoke / Pure Instrumental Mode)
+  public muteOriginalWords() {
+    this.stemMode = 'words_muted';
+    this.stemMixLevels.vocals = 0.0;
+    this.stemMixLevels.beat = 1.0;
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  // Mute Original Beat (Words Only / Acapella Mode)
+  public muteOriginalBeat() {
+    this.stemMode = 'words_only';
+    this.stemMixLevels.vocals = 1.15;
+    this.stemMixLevels.beat = 0.0;
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  // Restore Full Original Mix
+  public restoreFullMix() {
+    this.stemMode = 'full';
+    this.stemMixLevels.vocals = 1.0;
+    this.stemMixLevels.beat = 1.0;
+    this.swappedInstrumental = 'none';
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  // Change Music Style to any genre (Afrobeat, Amapiano, Southern Trap, UK Drill, etc.)
+  public changeMusicStyle(styleId: string, options: { muteOriginalBeat?: boolean; muteOriginalWords?: boolean } = {}) {
+    this.swappedInstrumental = styleId;
+    this.stemMode = 'swapped_instrumental';
+    const muteBeat = options.muteOriginalBeat ?? true;
+    const muteWords = options.muteOriginalWords ?? false;
+    this.stemMixLevels.beat = muteBeat ? 0.0 : 0.8;
+    this.stemMixLevels.vocals = muteWords ? 0.0 : 1.1;
+    this.stemMixLevels.swappedInstrumental = 1.05;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+  }
+
   private updateStemRouting() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
 
     const isWordsOnly = this.stemMode === 'words_only';
-    const isBeatOnly = this.stemMode === 'beat_only';
+    const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
     const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
 
-    // Vocal Gain
+    // Vocal Gain (Singing words & lyrics)
     if (this.vocalGain) {
-      const vVol = isBeatOnly ? 0.0 : this.stemMixLevels.vocals;
+      const vVol = isWordsMuted ? 0.0 : this.stemMixLevels.vocals;
       this.vocalGain.gain.setValueAtTime(vVol, now);
     }
 
-    // Beat Gain (Original Track's Instrumental)
+    // Beat Gain (Original Track's Instrumental backing)
     if (this.beatGain) {
       const bVol = (isWordsOnly || isSwapped) ? 0.0 : this.stemMixLevels.beat;
       this.beatGain.gain.setValueAtTime(bVol, now);
     }
 
-    // Swapped Instrumental Gain
+    // Swapped Instrumental Gain (New AI Style Beat)
     if (this.instrumentalGainNode) {
       const sVol = isSwapped ? this.stemMixLevels.swappedInstrumental : 0.0;
       this.instrumentalGainNode.gain.setValueAtTime(sVol, now);
@@ -225,7 +271,9 @@ export class MusicAudioEngine {
       : style === 'southern_gqom' ? 127 
       : style === 'soukous_sebene' ? 130 
       : style === 'bongo_flava' ? 104 
-      : style === 'south_african_3step' ? 118 : 112;
+      : style === 'south_african_3step' ? 118 
+      : style === 'southern_trap' ? 140
+      : style === 'uk_drill' ? 142 : 112;
 
     const beatInterval = 60 / bpm;
     const duration = beatInterval * 16; // 16 beats loop
@@ -382,6 +430,50 @@ export class MusicAudioEngine {
           r += h;
         }
 
+      } else if (style === 'southern_trap') {
+        // --- SOUTHERN TRAP & DIRTY SOUTH (140 BPM) ---
+        // Crushing 808 sub kick on beats 0, 1.5, 3
+        const is808 = (beat % 4 < 0.22) || (beat % 4 > 1.45 && beat % 4 < 1.7) || (beat % 4 > 2.95 && beat % 4 < 3.2);
+        if (is808) {
+          const tSub = (beat % 4 < 0.22 ? beat % 4 : beat % 4 > 1.45 && beat % 4 < 1.7 ? (beat % 4) - 1.5 : (beat % 4) - 3) * beatInterval;
+          if (tSub >= 0 && tSub < 0.25) {
+            const f808 = 95 * Math.exp(-tSub * 22) + 38;
+            const sub = Math.sin(2 * Math.PI * f808 * tSub) * Math.exp(-tSub * 6) * 0.48;
+            l += sub;
+            r += sub;
+          }
+        }
+        // Snappy Trap Clap on beat 2 of each 4
+        if (Math.floor(beat) % 4 === 2 && beatFrac < 0.12) {
+          const clap = (Math.random() * 2 - 1) * Math.exp(-beatFrac * 45) * 0.24;
+          l += clap * 0.9;
+          r += clap * 1.1;
+        }
+        // Triplet Trap Hi-Hats
+        const tripletHat = (t % (beatInterval / 6));
+        if (tripletHat < 0.02) {
+          const h = (Math.random() * 2 - 1) * Math.exp(-tripletHat * 120) * 0.055;
+          l += h * 0.7;
+          r += h * 1.3;
+        }
+
+      } else if (style === 'uk_drill') {
+        // --- UK DRILL 808 GLIDE (142 BPM) ---
+        // Pitch-sliding 808 glide
+        const drillSub = (beat % 4);
+        if (drillSub < 0.35) {
+          const glideFreq = 110 - drillSub * 140;
+          const d808 = Math.sin(2 * Math.PI * Math.max(36, glideFreq) * t) * 0.44;
+          l += d808;
+          r += d808;
+        }
+        // Off-beat counter snare on beat 3.5
+        if (beat % 4 > 3.45 && beat % 4 < 3.65) {
+          const sn = (Math.random() * 2 - 1) * 0.22;
+          l += sn;
+          r += sn;
+        }
+
       } else {
         // Default Afro-pop rhythmic backing
         if (beatFrac < 0.18) {
@@ -399,8 +491,8 @@ export class MusicAudioEngine {
     return buffer;
   }
 
-  // Generate synthetic high-quality demo track (Synthwave / Lo-fi / Papaoutai Afrobeat Remix)
-  public async loadSyntheticTrack(presetName: 'midnight_drive' | 'cyber_trap' | 'lofi_rain' | 'papaoutai_afro_remix' | 'afrobeat_lagos' | 'amapiano_logdrum'): Promise<AudioBuffer> {
+  // Generate synthetic high-quality demo track (Afrobeat Fusion / Amapiano / Synthwave / Lo-fi)
+  public async loadSyntheticTrack(presetName: 'midnight_drive' | 'cyber_trap' | 'lofi_rain' | 'viral_afro_fusion' | 'afrobeat_lagos' | 'amapiano_logdrum' | string): Promise<AudioBuffer> {
     this.initContext();
     const ctx = this.ctx!;
     const sampleRate = ctx.sampleRate;
@@ -409,19 +501,18 @@ export class MusicAudioEngine {
     const left = buffer.getChannelData(0);
     const right = buffer.getChannelData(1);
 
-    if (presetName === 'papaoutai_afro_remix' || presetName === 'afrobeat_lagos') {
-      // --- PAPAOUTAI VIRAL AFROBEAT RE-IMAGINATION ---
-      // 114 BPM Syncopated Lagos Afrobeat Groove + Stromae's iconic vocal hook synthesized
+    if (presetName === 'viral_afro_fusion' || presetName === 'afrobeat_lagos' || presetName === 'papaoutai_afro_remix') {
+      // --- VIRAL LAGOS AFROBEAT FUSION ANTHEM ---
+      // 114 BPM Syncopated Lagos Afrobeat Groove + Melodic Vocal Hook
       const bpm = 114;
       const beatInterval = 60 / bpm;
 
-      // Stromae "Papaoutai" vocal melody notes:
-      // "Dites-moi d'où il vient" / "Où t'es, papaoutai? Où t'es?"
+      // Universal Afro-Pop Pentatonic Vocal Hook melody notes:
       const vocalMelody = [
-        370.0, 440.0, 493.8, 554.3, 493.8, 440.0, 370.0, 0,    // "Dites-moi d'où il vient" (F#4, A4, B4, C#5...)
-        370.0, 440.0, 493.8, 554.3, 659.2, 554.3, 440.0, 0,    // "Enfin je saurai où je vais"
-        554.3, 493.8, 440.0, 370.0, 329.6, 370.0, 0, 0,        // "Où t'es, papaoutai?"
-        554.3, 493.8, 440.0, 370.0, 329.6, 370.0, 440.0, 554.3 // "Où t'es, où t'es, papaoutai?"
+        440.0, 493.8, 554.3, 659.2, 554.3, 493.8, 440.0, 0,
+        440.0, 554.3, 659.2, 740.0, 659.2, 554.3, 493.8, 0,
+        659.2, 554.3, 493.8, 440.0, 370.0, 440.0, 0, 0,
+        659.2, 554.3, 493.8, 440.0, 493.8, 554.3, 440.0, 0
       ];
 
       for (let i = 0; i < left.length; i++) {
@@ -801,9 +892,9 @@ export class MusicAudioEngine {
     this.vocalGain = ctx.createGain();
     this.beatGain = ctx.createGain();
     const isWordsOnly = this.stemMode === 'words_only';
-    const isBeatOnly = this.stemMode === 'beat_only';
+    const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
     const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
-    this.vocalGain.gain.value = isBeatOnly ? 0.0 : this.stemMixLevels.vocals;
+    this.vocalGain.gain.value = isWordsMuted ? 0.0 : this.stemMixLevels.vocals;
     this.beatGain.gain.value = (isWordsOnly || isSwapped) ? 0.0 : this.stemMixLevels.beat;
 
     // 6. Reverb Convolver & Dry/Wet Mixer

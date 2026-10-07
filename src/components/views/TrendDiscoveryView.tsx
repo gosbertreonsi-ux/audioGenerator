@@ -23,13 +23,22 @@ export const TrendDiscoveryView: React.FC<TrendDiscoveryViewProps> = ({
 }) => {
   const trendDatabase = [
     {
-      styleId: 'papaoutai_afro_remix',
-      name: 'Papaoutai -> Afrobeat Viral Remix',
+      styleId: 'viral_afro_fusion',
+      name: 'Afrobeat Style Shifter (Lagos Groove)',
       growth: '+340%',
-      creatorCount: '84,200',
-      engagement: '98% TikTok Shares',
+      creatorCount: '92,400',
+      engagement: '99% TikTok Shares',
       badge: 'TIKTOK #1 TRENDING',
-      bestGenre: 'French Pop / Afrobeat Fusion',
+      bestGenre: 'Afrobeat / West African Fusion',
+    },
+    {
+      styleId: 'mute_original_words',
+      name: 'Mute Original Words (Karaoke Instrumental)',
+      growth: '+285%',
+      creatorCount: '78,100',
+      engagement: '97% Sing-Along Retention',
+      badge: 'PRO INSTRUMENTAL #1',
+      bestGenre: 'Vocal Cancellation / Pure Backing',
     },
     {
       styleId: 'amapiano_log_drum',

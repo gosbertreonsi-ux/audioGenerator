@@ -75,7 +75,7 @@ const CATEGORY_TEMPLATES: {
     company: 'MusicMotion Neural Stem Extraction Engine',
     hardware: 'Neural Mid-Side Harmonic De-Mixer + Spectral Vocal Gate + Speech Formant Exciter',
     archetypes: [
-      { name: 'Papaoutai Viral Afro-Acapella Extractor', tag: 'French Pop Acapella Isolate', pitch: 0, tune: 15, verb: 20, drive: 15, desc: 'Strips heavy electro-pop synth bass & kicks, isolating pristine French vocal words ("Papaoutai") ready for Afrobeat drums!' },
+      { name: 'Global Acapella & Lyric Isolator Pro', tag: 'Neural Vocal Word Isolation', pitch: 0, tune: 15, verb: 20, drive: 15, desc: 'Strips heavy drum beats, bass kicks & synthesizers, isolating pristine human vocal words and lyrics ready for any music style!' },
       { name: 'Pure Spoken Words & Syllable Soloist', tag: '100% Drum Transient Mute', pitch: 0, tune: 30, verb: 10, drive: 12, desc: 'Completely eliminates drum kicks, 808s, and cymbals, delivering 100% pure voice syllables and lyrics.' },
       { name: 'Studio Acapella Master Isolator', tag: 'Zero-Bleed Vocal Stem', pitch: 0, tune: 20, verb: 25, drive: 18, desc: 'Professional acapella extraction focusing on center vocal channel with high speech intelligibility.' },
       { name: 'Acapella Harmony & Chants Extractor', tag: 'Multi-Voice Choir Isolate', pitch: 0, tune: 15, verb: 40, drive: 14, desc: 'Preserves full stereo backing vocals, harmonies, and adlibs while silencing the underlying beat.' },
