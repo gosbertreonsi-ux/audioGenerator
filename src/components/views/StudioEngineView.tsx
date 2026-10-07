@@ -25,6 +25,7 @@ interface StudioEngineViewProps {
   activePreset: TransformationPreset;
   onUpdatePreset: (preset: TransformationPreset) => void;
   onOpenMakeItAVibe: () => void;
+  onOpenVocalModels?: () => void;
 }
 
 export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
@@ -33,6 +34,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   activePreset,
   onUpdatePreset,
   onOpenMakeItAVibe,
+  onOpenVocalModels,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -246,6 +248,16 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {onOpenVocalModels && (
+            <button
+              onClick={onOpenVocalModels}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#290e10] hover:bg-[#3d1417] text-white border border-[#ea3838]/60 hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#ff6b72]" />
+              100+ Vocal Models
+            </button>
+          )}
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] text-xs font-bold transition-all shadow-md active:scale-95"

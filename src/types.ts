@@ -75,3 +75,29 @@ export interface Collaborator {
   status: 'In Studio' | 'Rendering' | 'Online' | 'Offline';
   currentTrack?: string;
 }
+
+export interface VocalModel {
+  id: string;
+  name: string;
+  companyOrLabel: string;
+  category: 'Pop & Billboard' | 'Hip-Hop & Trap' | 'R&B & Neo-Soul' | 'Drill & UK' | 'Hyperpop & Glitch' | 'Rock & Alternative' | 'Electronic & Dance' | 'Cinematic & Choral' | 'Retro & Vintage';
+  vocalistArchetype: string;
+  description: string;
+  hardwarePedigree: string;
+  settings: {
+    pitchShift: number;
+    autotuneSpeed: number;
+    formantShift: number;
+    saturationDrive: number;
+    reverbWet: number;
+    reverbDecay: number;
+    airBandBoost: number;
+    deEsserAmount: number;
+    doublerWidth: number;
+    chorusRate: number;
+    compressionRatio: string;
+  };
+  tags: string[];
+  color: string;
+  popularityScore: number;
+}

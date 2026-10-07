@@ -15,8 +15,10 @@ import { TrendDiscoveryView } from './components/views/TrendDiscoveryView';
 import { RightsCenterView } from './components/views/RightsCenterView';
 import { PublishingView } from './components/views/PublishingView';
 import { QuickUploadModal } from './components/QuickUploadModal';
+import { VocalModelsModal } from './components/VocalModelsModal';
+import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
 import { SAMPLE_TRACKS, PRESET_STYLES, COMMUNITY_CREATORS } from './lib/constants';
-import { AudioTrack, TransformationPreset } from './types';
+import { AudioTrack, TransformationPreset, VocalModel } from './types';
 import { globalAudioEngine } from './lib/audioEngine';
 
 export default function App() {
@@ -25,7 +27,33 @@ export default function App() {
   const [activePreset, setActivePreset] = useState<TransformationPreset>(PRESET_STYLES[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
+  const [isVocalModelsOpen, setIsVocalModelsOpen] = useState(false);
+  const [inspectedVocalModel, setInspectedVocalModel] = useState<VocalModel | null>(null);
+  const [activeVocalModel, setActiveVocalModel] = useState<VocalModel | null>(null);
   const [userName, setUserName] = useState('NIKITIN');
+
+  const handleSelectVocalModel = (model: VocalModel) => {
+    setActiveVocalModel(model);
+    const vocalPreset: TransformationPreset = {
+      id: model.id,
+      name: model.name,
+      category: 'Experimental',
+      badge: model.companyOrLabel.split('/')[0].trim(),
+      description: `${model.description} [${model.hardwarePedigree}]`,
+      speed: 1.0,
+      pitch: model.settings.pitchShift,
+      reverbWet: model.settings.reverbWet,
+      reverbDecay: model.settings.reverbDecay,
+      bassBoost: model.settings.pitchShift < 0 ? 5.5 : 2.5,
+      stereoWidth: model.settings.doublerWidth,
+      pan8d: model.category === 'Cinematic & Choral' || model.category === 'R&B & Neo-Soul',
+      panSpeed: 0.1,
+      lofiCutoff: model.category === 'Retro & Vintage' ? 3800 : 19000,
+      color: model.color,
+    };
+    setActivePreset(vocalPreset);
+    globalAudioEngine.setTransformation(vocalPreset);
+  };
 
   // Pre-load default synthetic audio engine so sounds are ready instantly
   useEffect(() => {
@@ -41,6 +69,7 @@ export default function App() {
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
+          onOpenVocalModels={() => setIsVocalModelsOpen(true)}
         />
 
         {/* Center Main Stage */}
@@ -51,6 +80,7 @@ export default function App() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onOpenExportsModal={() => setActiveTab('publish')}
+            onOpenVocalModels={() => setIsVocalModelsOpen(true)}
             onOpenProfileModal={() => {
               const name = prompt('Enter your producer/artist name:', userName);
               if (name && name.trim()) setUserName(name.trim());
@@ -77,6 +107,7 @@ export default function App() {
                 activePreset={activePreset}
                 onUpdatePreset={setActivePreset}
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
+                onOpenVocalModels={() => setIsVocalModelsOpen(true)}
               />
             )}
 
@@ -141,6 +172,23 @@ export default function App() {
           setCurrentTrack(track);
           setActiveTab('studio');
         }}
+      />
+
+      {/* 100+ Vocal Models Hub Modal */}
+      <VocalModelsModal
+        isOpen={isVocalModelsOpen}
+        onClose={() => setIsVocalModelsOpen(false)}
+        onSelectVocalModel={handleSelectVocalModel}
+        onInspectChain={(model) => setInspectedVocalModel(model)}
+        currentActiveModelId={activeVocalModel?.id}
+      />
+
+      {/* Hardware Chain Inspector Modal */}
+      <VocalChainInspectorModal
+        model={inspectedVocalModel}
+        isOpen={Boolean(inspectedVocalModel)}
+        onClose={() => setInspectedVocalModel(null)}
+        onApplyModel={handleSelectVocalModel}
       />
     </div>
   );

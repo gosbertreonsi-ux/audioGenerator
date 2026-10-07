@@ -8,6 +8,7 @@ interface HeaderBarProps {
   activeExportsCount?: number;
   onOpenExportsModal?: () => void;
   onOpenProfileModal?: () => void;
+  onOpenVocalModels?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -17,6 +18,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   activeExportsCount = 3,
   onOpenExportsModal,
   onOpenProfileModal,
+  onOpenVocalModels,
 }) => {
   return (
     <header className="flex items-center justify-between px-6 py-4 bg-[#18090b] border-b border-[#311315] select-none shrink-0">
@@ -30,6 +32,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           Pro Studio Live
         </div>
+        {onOpenVocalModels && (
+          <button
+            onClick={onOpenVocalModels}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2d1013] hover:bg-[#3d1417] border border-[#ea3838]/60 hover:border-[#ea3838] text-[11px] font-bold text-white shadow-sm transition-all active:scale-95"
+            title="Browse 100+ Major Record Label Vocal Models"
+          >
+            <span className="text-[#ff6b72]">✦</span>
+            100+ Vocal Models
+          </button>
+        )}
       </div>
 
       {/* Center: Search pill bar */}

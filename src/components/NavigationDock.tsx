@@ -7,7 +7,8 @@ import {
   ShieldCheck, 
   TrendingUp, 
   Send, 
-  Plus 
+  Plus,
+  Mic2
 } from 'lucide-react';
 
 export type NavTab = 'dashboard' | 'studio' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
@@ -16,12 +17,14 @@ interface NavigationDockProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   onOpenQuickUpload: () => void;
+  onOpenVocalModels?: () => void;
 }
 
 export const NavigationDock: React.FC<NavigationDockProps> = ({
   activeTab,
   onSelectTab,
   onOpenQuickUpload,
+  onOpenVocalModels,
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Console', icon: Home },
@@ -79,7 +82,20 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
       </div>
 
       {/* Floating Bottom Quick Upload/Plus Button (exact match to image bottom left) */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-2.5">
+        {onOpenVocalModels && (
+          <button
+            onClick={onOpenVocalModels}
+            className="group relative flex items-center justify-center w-11 h-11 rounded-2xl bg-[#280e10] hover:bg-[#ff3b47] text-[#ff6b72] hover:text-white border border-[#4d191c] hover:border-[#ea3838] shadow-md transition-all active:scale-95"
+            title="100+ Industry Vocal Models"
+          >
+            <Mic2 className="w-5 h-5 transition-transform group-hover:scale-110" />
+            <div className="absolute left-16 px-3 py-1.5 rounded-xl bg-[#220d0f] text-white text-xs font-semibold whitespace-nowrap border border-[#4d191c] shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all z-50">
+              100+ Industry Vocal Models
+            </div>
+          </button>
+        )}
+
         <button
           onClick={onOpenQuickUpload}
           className="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-[#220c0e] hover:bg-[#ea3838] text-[#ea3838] hover:text-white border-2 border-dashed border-[#ea3838]/60 hover:border-solid hover:border-[#ea3838] shadow-lg shadow-[#ea3838]/20 transition-all active:scale-95"
