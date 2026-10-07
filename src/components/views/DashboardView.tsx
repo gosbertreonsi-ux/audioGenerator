@@ -190,7 +190,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-[#441619] shrink-0">
                     <img
                       src={
-                        style.id === 'ultra_slowed_reverb'
+                        style.category === 'Remix & Swap' || style.category === 'Afrobeat'
+                          ? 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=200&q=80'
+                          : style.category === 'Amapiano' || style.category === 'African Rhythms'
+                          ? 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80'
+                          : style.id === 'ultra_slowed_reverb'
                           ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80'
                           : style.id === 'spatial_8d'
                           ? 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=200&q=80'

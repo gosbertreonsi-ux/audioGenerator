@@ -36,7 +36,7 @@ export const DownloadStemsModal: React.FC<DownloadStemsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleDownload = async (stemType: 'master' | 'vocals' | 'instrumental' | 'all') => {
+  const handleDownload = async (stemType: 'master' | 'vocals' | 'instrumental' | 'swapped_remix' | 'all') => {
     setDownloadingStem(stemType);
     try {
       if (stemType === 'all') {
@@ -44,18 +44,26 @@ export const DownloadStemsModal: React.FC<DownloadStemsModalProps> = ({
         const masterBlob = await globalAudioEngine.renderAndExportWAV({ stemType: 'master' });
         triggerDownload(masterBlob, `${track.title}_MASTER_${preset.name.replace(/\s+/g, '_')}.wav`);
 
-        // Download Vocals
+        // Download Vocals (Words Only)
         const vocalBlob = await globalAudioEngine.renderAndExportWAV({ stemType: 'vocals' });
-        triggerDownload(vocalBlob, `${track.title}_EDITED_VOCALS_${preset.name.replace(/\s+/g, '_')}.wav`);
+        triggerDownload(vocalBlob, `${track.title}_WORDS_ONLY_VOCALS_${preset.name.replace(/\s+/g, '_')}.wav`);
 
         // Download Instrumental
         const instBlob = await globalAudioEngine.renderAndExportWAV({ stemType: 'instrumental' });
         triggerDownload(instBlob, `${track.title}_INSTRUMENTAL_${preset.name.replace(/\s+/g, '_')}.wav`);
 
-        setDownloadedStems((prev) => ({ ...prev, all: true, master: true, vocals: true, instrumental: true }));
+        // Download Swapped Remix if preset has swap
+        if (preset.instrumentalSwap && preset.instrumentalSwap !== 'none') {
+          const swapBlob = await globalAudioEngine.renderAndExportWAV({ stemType: 'swapped_remix' });
+          triggerDownload(swapBlob, `${track.title}_AFRO_REMIX_${preset.instrumentalSwap.toUpperCase()}.wav`);
+        }
+
+        setDownloadedStems((prev) => ({ ...prev, all: true, master: true, vocals: true, instrumental: true, swapped_remix: true }));
       } else {
         const blob = await globalAudioEngine.renderAndExportWAV({ stemType });
-        const suffix = stemType === 'vocals' ? 'EDITED_VOCALS' : stemType === 'instrumental' ? 'INSTRUMENTAL' : 'MASTER';
+        const suffix = stemType === 'vocals' ? 'WORDS_ONLY_VOCALS' 
+          : stemType === 'instrumental' ? 'INSTRUMENTAL' 
+          : stemType === 'swapped_remix' ? 'AFRO_REMIX_MASTER' : 'MASTER';
         triggerDownload(blob, `${track.title}_${suffix}_${preset.name.replace(/\s+/g, '_')}.wav`);
         setDownloadedStems((prev) => ({ ...prev, [stemType]: true }));
       }

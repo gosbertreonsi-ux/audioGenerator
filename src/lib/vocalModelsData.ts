@@ -9,6 +9,80 @@ const CATEGORY_TEMPLATES: {
   archetypes: { name: string; tag: string; pitch: number; tune: number; verb: number; drive: number; desc: string }[];
 }[] = [
   {
+    category: 'Afrobeat & West African',
+    company: 'Spaceship Collective / Mavin Records / YBNL / Starboy',
+    hardware: 'Sony C-800G + Neve 1073 + Tube-Tech CL1B + Bricasti M7 + Lexicon 480L',
+    archetypes: [
+      { name: 'Burna Boy African Giant Baritone', tag: 'Deep African Baritone', pitch: -2, tune: 15, verb: 35, drive: 40, desc: 'Rich 110Hz chest resonance, bold Yoruba cadence, and warm analog harmonic valve saturation.' },
+      { name: 'Wizkid Starboy Silky Falsetto', tag: 'Silky Airy Falsetto', pitch: 1, tune: 8, verb: 48, drive: 18, desc: 'Ultra-light vocal timbre, airy 14kHz shine, with smooth micro-pitch stereo width.' },
+      { name: 'Rema Afro-Rave Melisma & Chants', tag: 'Indian-Afro Melisma', pitch: 2, tune: 4, verb: 52, drive: 22, desc: 'Fast quarter-tone melismatic pitch bends, sparkling top end, and exotic hypnotic vocal flutter.' },
+      { name: 'Asake Fuji Choral Wall of Sound', tag: 'Fuji Street Choir Stack', pitch: 0, tune: 6, verb: 42, drive: 45, desc: 'Multi-tracked gang vocal choral spread with high-energy street cadence and 1176 slam.' },
+      { name: 'Tiwa Savage Queen of Afrobeats', tag: 'Velvet R&B Afro Sheen', pitch: 1, tune: 12, verb: 40, drive: 16, desc: 'Pristine tube warmth, delicate silky high-register vibrato, and crystal-clear de-essing.' },
+      { name: 'Fela Kuti Kalakuta Poly-Vocal Leader', tag: 'Afrobeat Pioneer Call & Response', pitch: 0, tune: 45, verb: 30, drive: 55, desc: 'Raw call-and-response horn bleed and Afrobeat pioneer spirit with vintage console grit.' },
+      { name: 'Ayra Starr Celestial Gen-Z Sheen', tag: 'Hyper-Melodic Youth Star', pitch: 2, tune: 5, verb: 46, drive: 20, desc: 'Bright radio-ready vocal projection with modern hyper-tuned sheen and wide chorus double.' },
+      { name: 'Omah Lay Midnight Afro-Soul', tag: 'Moody Late-Night Intimacy', pitch: -1, tune: 14, verb: 60, drive: 25, desc: 'Dark ambient room reflections, melancholic vocal delivery, and warm tape delay repeats.' },
+      { name: 'CKay Emo-Afrobeats Whisper', tag: 'Binaural Romantic Whisper', pitch: 0, tune: 10, verb: 55, drive: 12, desc: 'Ultra-close acoustic proximity, breathy vocal delivery, and 360° binaural stereo whispers.' },
+      { name: 'Davido OBO High-Energy Anthem', tag: 'Hype Throat Projection', pitch: 0, tune: 10, verb: 28, drive: 52, desc: 'Aggressive forward projection with punchy midrange presence designed to cut through stadium horns.' },
+      { name: 'Tems Velvet Soul Alté Voice', tag: 'Deep Alté Contralto', pitch: -2, tune: 22, verb: 58, drive: 20, desc: 'Commanding contralto register with rich low-mids, tube saturation, and expansive hall reverb.' },
+      { name: 'Yemi Alade Mama Africa Belt', tag: 'Dynamic Power Afro-Pop', pitch: 1, tune: 16, verb: 36, drive: 35, desc: 'Soaring dynamic vocal belt with brassy resonance and crisp stereo imaging.' },
+    ]
+  },
+  {
+    category: 'Amapiano & Southern African',
+    company: 'Piano Hub / Sony Music SA / Kalawa Jazmee / Afrotainment',
+    hardware: 'Neumann U87 Ai + SSL 4000E + Manley VOXBOX + Bricasti Plate',
+    archetypes: [
+      { name: 'Kabza De Small Soulful Piano Chants', tag: 'Ancestral Amapiano Chants', pitch: -1, tune: 12, verb: 55, drive: 28, desc: 'Deep ancestral melodic vocal chants sidechained to pump dynamically with heavy log drums.' },
+      { name: 'Young Stunna Bacardi Vocal Chants', tag: 'Fast Bacardi Flow', pitch: 1, tune: 5, verb: 35, drive: 38, desc: 'High-speed syncopated Bacardi cadence with punchy opto-compression and crisp top-end bite.' },
+      { name: 'Focalistic Pretoria Spitori Punch', tag: 'Spitori Street Slang', pitch: 0, tune: 8, verb: 22, drive: 48, desc: 'Energetic township vernacular flow with upfront vocal presence cutting through deep basslines.' },
+      { name: 'DBN Gogo Sgija Bass Hug Vocals', tag: 'Hypnotic Sgija Hum', pitch: -3, tune: 10, verb: 62, drive: 30, desc: 'Sub-filtered vocal hums with wide hypnotic stereo chorus and cavernous atmospheric decay.' },
+      { name: 'Daliwonga Velvety Amapiano Tenor', tag: 'Silky Piano Ballad Tenor', pitch: 0, tune: 7, verb: 48, drive: 18, desc: 'Smooth romantic tenor delivery drenched in warm Lexicon room reflections and gentle autotune.' },
+      { name: 'Kamo Mphela High-Octane Dance Adlibs', tag: 'Rhythmic Dance Shouts', pitch: 2, tune: 4, verb: 30, drive: 42, desc: 'Rapid infectious dance calls and rhythmic syncopated shouts designed for high-energy Amapiano dancebreaks.' },
+      { name: 'South African 3-Step House Vocalist', tag: 'Tribal Deep House 3-Step', pitch: 0, tune: 18, verb: 68, drive: 22, desc: 'Ethereal tribal deep house vocals floating across 3-step polyrhythmic delays and analog tape warmth.' },
+      { name: 'Durban Gqom Dark Zulu War Chants', tag: 'Distorted Durban War Chant', pitch: -4, tune: 25, verb: 32, drive: 75, desc: 'Aggressive distorted heavy tribal chants designed for dark 127 BPM Durban Gqom kicks.' },
+      { name: 'Kwaito Mandoza Heavy Grit Lead', tag: 'Gravel Township Grit', pitch: -3, tune: 40, verb: 20, drive: 65, desc: 'Gritty, deep gravel township voice with vintage analog tape saturation and punchy mono weight.' },
+      { name: 'DJ Maphorisa Madumane Sing-Rap', tag: 'Amapiano Sing-Rap Hybrid', pitch: 0, tune: 3, verb: 38, drive: 32, desc: 'Melodic auto-tuned Amapiano rap hybrid with bright air band and stereo micro-pitch widening.' },
+      { name: 'Uncle Waffles Amapiano Groove Whispers', tag: 'High-Energy DJ Vocal Drops', pitch: 1, tune: 10, verb: 45, drive: 25, desc: 'Punchy DJ vocal drops, infectious giggles, and rhythmic hype shouts over syncopated shakers.' },
+      { name: 'Nasty C Durban Trap Flow', tag: 'Razor-Sharp Lyricism', pitch: 0, tune: 6, verb: 24, drive: 36, desc: 'Laser-accurate dynamic articulation with fast transient response and modern radio sheen.' },
+    ]
+  },
+  {
+    category: 'East & Central African',
+    company: 'WCB Wasafi / Electromode / Sol Generation / Quartier Latin',
+    hardware: 'AKG C12 VR + Neve 1073 + Fairchild 670 + EMT 250',
+    archetypes: [
+      { name: 'Diamond Platnumz Bongo Flava Melisma', tag: 'Arabesque Swahili Melisma', pitch: 1, tune: 8, verb: 44, drive: 24, desc: 'Sweet Arabesque coastal Swahili vocal vibrato with pristine radio polish and pitch agility.' },
+      { name: 'Fally Ipupa Congolese Sebene Crooner', tag: 'Lingala Bel Canto Rumba', pitch: 0, tune: 14, verb: 50, drive: 20, desc: 'Romantic Lingala bel canto tenor with sweet tube warmth, gliding over Congolese sebene guitars.' },
+      { name: 'Koffi Olomide Tcha Tcho Rumba Bass', tag: 'Deep Rumba Declamatory', pitch: -3, tune: 35, verb: 40, drive: 30, desc: 'Sultry, deep spoken rumba poetry and bass harmony with intimate acoustic chamber ambience.' },
+      { name: 'Gengetone Nairobi Sheng Energy', tag: 'Street Sheng Party Bounce', pitch: 0, tune: 12, verb: 20, drive: 55, desc: 'Raw Nairobi street party cadence with saturated preamp drive and aggressive compressor pumping.' },
+      { name: 'Sauti Sol 4-Part Kenyan Harmony', tag: 'Polyphonic Soul Harmonies', pitch: 0, tune: 25, verb: 55, drive: 15, desc: 'Rich acoustic 4-part polyphonic harmonies with organic room depth and warm acoustic guitar resonance.' },
+      { name: 'Zuchu Swahili Coastal Harmony', tag: 'Coastal Taarab Grace', pitch: 1, tune: 10, verb: 48, drive: 18, desc: 'Sweet Taarab-infused melodic runs with shimmering plate reverb and delicate vocal flutter.' },
+    ]
+  },
+  {
+    category: 'North African & Maghreb',
+    company: 'Barclay Records / Casablanca Urban / Cairo Sound Stage',
+    hardware: 'Neumann U47 + Teletronix LA-2A + Lexicon 224',
+    archetypes: [
+      { name: 'Cheb Khaled King of Rai Microtone', tag: 'Algerian Rai Microtonal Runs', pitch: 0, tune: 20, verb: 55, drive: 35, desc: 'Emotive Algerian Rai vocal runs with quarter-tone inflections and analog tape slap.' },
+      { name: 'El Grande Toto Casablanca Trap-Rai', tag: 'Maghreb Trap Auto-Tune', pitch: -1, tune: 3, verb: 45, drive: 40, desc: 'Auto-tuned Maghreb trap delivery with Moroccan Darija flow and dark sub-room depth.' },
+      { name: 'Gnawa Master Guembri Trance Chants', tag: 'Trance Pentatonic Chants', pitch: -2, tune: 45, verb: 70, drive: 15, desc: 'Spiritual hypnotic pentatonic chanting with iron qraqeb echoes and cavernous sanctuary reflections.' },
+      { name: 'Cairo Mahraganat Street Auto-Tune', tag: 'Hyper-Overdriven Electro-Shaabi', pitch: 2, tune: 0, verb: 30, drive: 80, desc: 'Hyper-saturated overdriven street autotune and festive shouting over fast electronic Shaabi beats.' },
+    ]
+  },
+  {
+    category: 'Words Only & Acapella Isolators',
+    company: 'MusicMotion Neural Stem Extraction Engine',
+    hardware: 'Neural Mid-Side Harmonic De-Mixer + Spectral Vocal Gate + Speech Formant Exciter',
+    archetypes: [
+      { name: 'Papaoutai Viral Afro-Acapella Extractor', tag: 'French Pop Acapella Isolate', pitch: 0, tune: 15, verb: 20, drive: 15, desc: 'Strips heavy electro-pop synth bass & kicks, isolating pristine French vocal words ("Papaoutai") ready for Afrobeat drums!' },
+      { name: 'Pure Spoken Words & Syllable Soloist', tag: '100% Drum Transient Mute', pitch: 0, tune: 30, verb: 10, drive: 12, desc: 'Completely eliminates drum kicks, 808s, and cymbals, delivering 100% pure voice syllables and lyrics.' },
+      { name: 'Studio Acapella Master Isolator', tag: 'Zero-Bleed Vocal Stem', pitch: 0, tune: 20, verb: 25, drive: 18, desc: 'Professional acapella extraction focusing on center vocal channel with high speech intelligibility.' },
+      { name: 'Acapella Harmony & Chants Extractor', tag: 'Multi-Voice Choir Isolate', pitch: 0, tune: 15, verb: 40, drive: 14, desc: 'Preserves full stereo backing vocals, harmonies, and adlibs while silencing the underlying beat.' },
+      { name: 'Radio Broadcast Speech Formant Cleaner', tag: 'Speech Formant Clarity', pitch: 0, tune: 25, verb: 12, drive: 22, desc: 'Enhances 2.8kHz-4kHz speech formants, suppresses background noise, and creates ultra-crisp spoken vocal presence.' },
+    ]
+  },
+  {
     category: 'Pop & Billboard',
     company: 'Republic Records / Max Martin Studio',
     hardware: 'Sony C-800G + Neve 1073 + Tube-Tech CL1B + Bricasti M7',

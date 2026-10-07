@@ -13,7 +13,8 @@ import {
   Flame, 
   Check, 
   Loader2,
-  Video
+  Video,
+  Zap
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset, VocalModel } from '../../types';
 import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
@@ -29,6 +30,8 @@ interface StudioEngineViewProps {
   onOpenMakeItAVibe: () => void;
   onOpenVocalModels?: () => void;
   onOpenVideoStudio?: () => void;
+  onOpenInstrumentalSwapper?: () => void;
+  onOpenBeatMaker?: () => void;
   activeVocalModel?: VocalModel | null;
 }
 
@@ -40,6 +43,8 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   onOpenMakeItAVibe,
   onOpenVocalModels,
   onOpenVideoStudio,
+  onOpenInstrumentalSwapper,
+  onOpenBeatMaker,
   activeVocalModel,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -221,7 +226,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
     }
   };
 
-  const categories = ['All', 'Slowed', 'Sped Up', 'Spatial', 'Reverb', 'Bass', 'Atmosphere', 'Retro', 'Experimental'];
+  const categories = ['All', 'Afrobeat', 'Amapiano', 'African Rhythms', 'Remix & Swap', 'Slowed', 'Sped Up', 'Spatial', 'Reverb', 'Bass', 'Atmosphere', 'Retro', 'Experimental'];
   const filteredPresets = selectedCategory === 'All'
     ? PRESET_STYLES
     : PRESET_STYLES.filter((p) => p.category === selectedCategory);
@@ -230,6 +235,30 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
     const mins = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
     return `${mins}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const handleQuickWordsOnly = () => {
+    const isCurrentlyWordsOnly = globalAudioEngine.getStemMode() === 'words_only';
+    if (isCurrentlyWordsOnly) {
+      globalAudioEngine.setStemMode('full');
+      globalAudioEngine.setStemLevels({ vocals: 1.0, beat: 1.0, swappedInstrumental: 0.0 });
+    } else {
+      globalAudioEngine.setStemMode('words_only');
+      globalAudioEngine.setStemLevels({ vocals: 1.15, beat: 0.0, swappedInstrumental: 0.0 });
+    }
+  };
+
+  const handleQuickPapaoutaiRemix = async () => {
+    const papa = SAMPLE_TRACKS.find(t => t.id === 'papaoutai-afrobeat-remix') || SAMPLE_TRACKS[0];
+    onUpdateTrack(papa);
+    await globalAudioEngine.loadSyntheticTrack('papaoutai_afro_remix');
+    const papaPreset = PRESET_STYLES.find(p => p.id === 'papaoutai_afro_remix') || PRESET_STYLES[0];
+    onUpdatePreset(papaPreset);
+    globalAudioEngine.setTransformation(papaPreset);
+    globalAudioEngine.setStemMode('swapped_instrumental');
+    globalAudioEngine.setSwappedInstrumental('afrobeat_lagos');
+    globalAudioEngine.setStemLevels({ vocals: 1.1, beat: 0.0, swappedInstrumental: 1.05 });
+    globalAudioEngine.play();
   };
 
   return (
@@ -287,13 +316,33 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {onOpenInstrumentalSwapper && (
+            <button
+              onClick={onOpenInstrumentalSwapper}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#2a1309] hover:bg-[#3d1a0d] text-[#f59e0b] border border-[#f59e0b]/60 hover:border-[#f59e0b] text-xs font-bold transition-all shadow-md active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Afro Remixer & Swapper
+            </button>
+          )}
+
+          {onOpenBeatMaker && (
+            <button
+              onClick={onOpenBeatMaker}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1e0e29] hover:bg-[#2b143b] text-[#c084fc] border border-[#8b5cf6]/60 hover:border-[#8b5cf6] text-xs font-bold transition-all shadow-md active:scale-95"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              16-Step Beat Maker
+            </button>
+          )}
+
           {onOpenVocalModels && (
             <button
               onClick={onOpenVocalModels}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#290e10] hover:bg-[#3d1417] text-white border border-[#ea3838]/60 hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95"
             >
               <Sparkles className="w-3.5 h-3.5 text-[#ff6b72]" />
-              100+ Vocal Models
+              100+ Vocal Models (African Suite)
             </button>
           )}
 
@@ -423,8 +472,102 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
         </div>
 
         {/* =========================================================================
-            MULTI-STYLE MIXER & STACKER (Section 12: Combine Multiple Styles Simultaneously)
+            AFRICAN REMIXER & WORDS-ONLY (ACAPELLA) STATION
            ========================================================================= */}
+        <div className="p-5 rounded-2xl bg-gradient-to-r from-[#240e07] via-[#2f1214] to-[#18080a] border border-[#f59e0b]/40 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-[#f59e0b]/20 border border-[#f59e0b]/40 text-[#f59e0b] text-[10px] font-black uppercase tracking-wider">
+                VIRAL AFRO TRANSFORMATION
+              </span>
+              <h3 className="text-sm font-black text-white uppercase tracking-tight">
+                AFROBEAT REMIXER & WORDS-ONLY (MUTE BEAT) ENGINE
+              </h3>
+            </div>
+            <span className="text-[11px] text-[#e6bca0]">
+              Isolate vocals, silence backing beat, or swap to Lagos Afrobeat & Amapiano log drums
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* 1-Click Papaoutai Afro Remix */}
+            <button
+              onClick={handleQuickPapaoutaiRemix}
+              className="p-3.5 rounded-xl bg-gradient-to-br from-[#f59e0b]/25 to-[#ea580c]/25 hover:from-[#f59e0b]/35 hover:to-[#ea580c]/35 border border-[#f59e0b]/60 text-left transition-all group"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-black text-[#f59e0b] uppercase">VIRAL PRESET</span>
+                <Flame className="w-3.5 h-3.5 text-[#f59e0b]" />
+              </div>
+              <div className="text-xs font-black text-white group-hover:text-[#fcd34d]">
+                Papaoutai Afrobeat Remix
+              </div>
+              <div className="text-[10px] text-[#e6bca0] mt-0.5">
+                Isolate words + 114 BPM Lagos Afro beat
+              </div>
+            </button>
+
+            {/* Quick Words Only / Acapella Toggle */}
+            <button
+              onClick={handleQuickWordsOnly}
+              className={`p-3.5 rounded-xl border text-left transition-all ${
+                globalAudioEngine.getStemMode() === 'words_only'
+                  ? 'bg-[#06b6d4]/25 border-[#06b6d4] text-white shadow-lg shadow-[#06b6d4]/20'
+                  : 'bg-[#1e0a0d] border-[#361315] hover:border-[#06b6d4]/50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-black text-[#06b6d4] uppercase">ACAPELLA</span>
+                <Activity className="w-3.5 h-3.5 text-[#06b6d4]" />
+              </div>
+              <div className="text-xs font-black text-white">
+                Words Only (Mute Beat)
+              </div>
+              <div className="text-[10px] text-[#a67c7f] mt-0.5">
+                {globalAudioEngine.getStemMode() === 'words_only' ? 'Active: Beat Muted!' : 'Mute drums & instrumentals'}
+              </div>
+            </button>
+
+            {/* Launch Full Stem Swapper */}
+            {onOpenInstrumentalSwapper && (
+              <button
+                onClick={onOpenInstrumentalSwapper}
+                className="p-3.5 rounded-xl bg-[#280f12] hover:bg-[#381419] border border-[#4d191c] hover:border-[#ea3838] text-left transition-all group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-[#ff6b72] uppercase">REMIX DECK</span>
+                  <Sliders className="w-3.5 h-3.5 text-[#ea3838]" />
+                </div>
+                <div className="text-xs font-black text-white group-hover:text-[#ff6b72]">
+                  Instrumental Swapper Modal
+                </div>
+                <div className="text-[10px] text-[#a67c7f] mt-0.5">
+                  Dual faders & 6 African genres
+                </div>
+              </button>
+            )}
+
+            {/* Launch 16-Step Beat Maker */}
+            {onOpenBeatMaker && (
+              <button
+                onClick={onOpenBeatMaker}
+                className="p-3.5 rounded-xl bg-[#1e0e29] hover:bg-[#2b143b] border border-[#8b5cf6]/50 hover:border-[#8b5cf6] text-left transition-all group"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-[#c084fc] uppercase">STEP SEQUENCER</span>
+                  <Zap className="w-3.5 h-3.5 text-[#c084fc]" />
+                </div>
+                <div className="text-xs font-black text-white group-hover:text-[#c084fc]">
+                  16-Step Beat Maker Machine
+                </div>
+                <div className="text-[10px] text-[#a67c7f] mt-0.5">
+                  Live drum pads & African rhythms
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="p-4 rounded-2xl bg-[#17080a] border border-[#3e1618] space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">

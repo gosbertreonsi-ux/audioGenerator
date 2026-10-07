@@ -8,7 +8,9 @@ import {
   TrendingUp, 
   Send, 
   Plus,
-  Mic2
+  Mic2,
+  ArrowRightLeft,
+  Zap
 } from 'lucide-react';
 
 export type NavTab = 'dashboard' | 'studio' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
@@ -18,6 +20,8 @@ interface NavigationDockProps {
   onSelectTab: (tab: NavTab) => void;
   onOpenQuickUpload: () => void;
   onOpenVocalModels?: () => void;
+  onOpenInstrumentalSwapper?: () => void;
+  onOpenBeatMaker?: () => void;
 }
 
 export const NavigationDock: React.FC<NavigationDockProps> = ({
@@ -25,6 +29,8 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
   onSelectTab,
   onOpenQuickUpload,
   onOpenVocalModels,
+  onOpenInstrumentalSwapper,
+  onOpenBeatMaker,
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'dashboard', label: 'Console', icon: Home },
@@ -83,6 +89,32 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
 
       {/* Floating Bottom Quick Upload/Plus Button (exact match to image bottom left) */}
       <div className="flex flex-col items-center gap-2.5">
+        {onOpenInstrumentalSwapper && (
+          <button
+            onClick={onOpenInstrumentalSwapper}
+            className="group relative flex items-center justify-center w-11 h-11 rounded-2xl bg-[#280e10] hover:bg-[#f59e0b] text-[#f59e0b] hover:text-black border border-[#4d191c] hover:border-[#f59e0b] shadow-md transition-all active:scale-95"
+            title="Afrobeat Remixer & Stem Swapper"
+          >
+            <ArrowRightLeft className="w-5 h-5 transition-transform group-hover:scale-110" />
+            <div className="absolute left-16 px-3 py-1.5 rounded-xl bg-[#220d0f] text-white text-xs font-semibold whitespace-nowrap border border-[#4d191c] shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all z-50">
+              Afrobeat Remixer & Stem Swapper
+            </div>
+          </button>
+        )}
+
+        {onOpenBeatMaker && (
+          <button
+            onClick={onOpenBeatMaker}
+            className="group relative flex items-center justify-center w-11 h-11 rounded-2xl bg-[#280e10] hover:bg-[#8b5cf6] text-[#c084fc] hover:text-white border border-[#4d191c] hover:border-[#8b5cf6] shadow-md transition-all active:scale-95"
+            title="16-Step Beat Maker & Sequencer"
+          >
+            <Zap className="w-5 h-5 transition-transform group-hover:scale-110" />
+            <div className="absolute left-16 px-3 py-1.5 rounded-xl bg-[#220d0f] text-white text-xs font-semibold whitespace-nowrap border border-[#4d191c] shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all z-50">
+              16-Step Beat Maker & Sequencer
+            </div>
+          </button>
+        )}
+
         {onOpenVocalModels && (
           <button
             onClick={onOpenVocalModels}
@@ -91,7 +123,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
           >
             <Mic2 className="w-5 h-5 transition-transform group-hover:scale-110" />
             <div className="absolute left-16 px-3 py-1.5 rounded-xl bg-[#220d0f] text-white text-xs font-semibold whitespace-nowrap border border-[#4d191c] shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-all z-50">
-              100+ Industry Vocal Models
+              100+ Industry Vocal Models (African Suite)
             </div>
           </button>
         )}

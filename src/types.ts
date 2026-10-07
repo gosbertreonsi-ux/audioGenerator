@@ -17,7 +17,7 @@ export interface AudioTrack {
 export interface TransformationPreset {
   id: string;
   name: string;
-  category: 'Slowed' | 'Sped Up' | 'Spatial' | 'Reverb' | 'Bass' | 'Atmosphere' | 'Retro' | 'Experimental';
+  category: 'Slowed' | 'Sped Up' | 'Spatial' | 'Reverb' | 'Bass' | 'Atmosphere' | 'Retro' | 'Experimental' | 'Afrobeat' | 'Amapiano' | 'African Rhythms' | 'Remix & Swap';
   badge: string;
   description: string;
   speed: number; // 0.5 - 1.6
@@ -30,6 +30,8 @@ export interface TransformationPreset {
   panSpeed: number; // 0.04 - 0.4 Hz
   lofiCutoff: number; // 1000 - 20000 Hz
   color: string;
+  stemMode?: 'full' | 'words_only' | 'beat_only' | 'swapped_instrumental';
+  instrumentalSwap?: string;
 }
 
 export interface ContentPack {
@@ -108,7 +110,21 @@ export interface VocalModel {
   id: string;
   name: string;
   companyOrLabel: string;
-  category: 'Pop & Billboard' | 'Hip-Hop & Trap' | 'R&B & Neo-Soul' | 'Drill & UK' | 'Hyperpop & Glitch' | 'Rock & Alternative' | 'Electronic & Dance' | 'Cinematic & Choral' | 'Retro & Vintage';
+  category: 
+    | 'Afrobeat & West African' 
+    | 'Amapiano & Southern African' 
+    | 'East & Central African' 
+    | 'North African & Maghreb' 
+    | 'Words Only & Acapella Isolators' 
+    | 'Pop & Billboard' 
+    | 'Hip-Hop & Trap' 
+    | 'R&B & Neo-Soul' 
+    | 'Drill & UK' 
+    | 'Hyperpop & Glitch' 
+    | 'Rock & Alternative' 
+    | 'Electronic & Dance' 
+    | 'Cinematic & Choral' 
+    | 'Retro & Vintage';
   vocalistArchetype: string;
   description: string;
   hardwarePedigree: string;
@@ -129,3 +145,25 @@ export interface VocalModel {
   color: string;
   popularityScore: number;
 }
+
+export type StemMode = 'full' | 'words_only' | 'beat_only' | 'swapped_instrumental';
+
+export interface InstrumentalSwapOption {
+  id: string;
+  name: string;
+  genre: string;
+  bpm: number;
+  origin: string;
+  description: string;
+  instruments: string[];
+  color: string;
+  badge: string;
+}
+
+export interface StemMixLevels {
+  vocals: number; // 0.0 - 1.5
+  beat: number; // 0.0 - 1.5
+  swappedInstrumental: number; // 0.0 - 1.5
+  bass: number; // 0.0 - 1.5
+}
+

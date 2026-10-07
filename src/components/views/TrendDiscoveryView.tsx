@@ -23,6 +23,42 @@ export const TrendDiscoveryView: React.FC<TrendDiscoveryViewProps> = ({
 }) => {
   const trendDatabase = [
     {
+      styleId: 'papaoutai_afro_remix',
+      name: 'Papaoutai -> Afrobeat Viral Remix',
+      growth: '+340%',
+      creatorCount: '84,200',
+      engagement: '98% TikTok Shares',
+      badge: 'TIKTOK #1 TRENDING',
+      bestGenre: 'French Pop / Afrobeat Fusion',
+    },
+    {
+      styleId: 'amapiano_log_drum',
+      name: 'Amapiano Deep Log Drum',
+      growth: '+210%',
+      creatorCount: '68,400',
+      engagement: '96% Dance Retention',
+      badge: 'GLOBAL DANCE #1',
+      bestGenre: 'Amapiano / South African House',
+    },
+    {
+      styleId: 'words_only_acapella',
+      name: 'Words Only (Beat Muted) - Acapella Studio',
+      growth: '+175%',
+      creatorCount: '52,100',
+      engagement: '95% Remix Sampling',
+      badge: 'CREATOR ESSENTIAL',
+      bestGenre: 'All Vocals / Speech / Acapellas',
+    },
+    {
+      styleId: 'afrobeat_lagos_groove',
+      name: 'Afrobeat Lagos Syncopation',
+      growth: '+145%',
+      creatorCount: '46,000',
+      engagement: '93% Spotify Viral 50',
+      badge: 'AFROPOP WAVE',
+      bestGenre: 'Afrobeats / Highlife / Naija',
+    },
+    {
       styleId: 'ultra_slowed_reverb',
       name: 'Ultra Slowed + Reverb',
       growth: '+82%',

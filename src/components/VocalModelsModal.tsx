@@ -39,6 +39,11 @@ export const VocalModelsModal: React.FC<VocalModelsModalProps> = ({
 
   const categories = [
     'All',
+    'Afrobeat & West African',
+    'Amapiano & Southern African',
+    'East & Central African',
+    'North African & Maghreb',
+    'Words Only & Acapella Isolators',
     'Pop & Billboard',
     'Hip-Hop & Trap',
     'R&B & Neo-Soul',

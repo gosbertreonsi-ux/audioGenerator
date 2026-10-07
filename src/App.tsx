@@ -17,6 +17,8 @@ import { PublishingView } from './components/views/PublishingView';
 import { QuickUploadModal } from './components/QuickUploadModal';
 import { VocalModelsModal } from './components/VocalModelsModal';
 import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
+import { InstrumentalSwapperModal } from './components/InstrumentalSwapperModal';
+import { BeatMakerStudioModal } from './components/BeatMakerStudioModal';
 import { SAMPLE_TRACKS, PRESET_STYLES, COMMUNITY_CREATORS } from './lib/constants';
 import { AudioTrack, TransformationPreset, VocalModel } from './types';
 import { globalAudioEngine } from './lib/audioEngine';
@@ -28,6 +30,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
   const [isVocalModelsOpen, setIsVocalModelsOpen] = useState(false);
+  const [isInstrumentalSwapperOpen, setIsInstrumentalSwapperOpen] = useState(false);
+  const [isBeatMakerOpen, setIsBeatMakerOpen] = useState(false);
   const [inspectedVocalModel, setInspectedVocalModel] = useState<VocalModel | null>(null);
   const [activeVocalModel, setActiveVocalModel] = useState<VocalModel | null>(null);
   const [userName, setUserName] = useState('LEONCE');
@@ -70,6 +74,8 @@ export default function App() {
           onSelectTab={setActiveTab}
           onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
           onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+          onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
+          onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
         />
 
         {/* Center Main Stage */}
@@ -109,6 +115,8 @@ export default function App() {
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
                 onOpenVocalModels={() => setIsVocalModelsOpen(true)}
                 onOpenVideoStudio={() => setActiveTab('visuals')}
+                onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
+                onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
                 activeVocalModel={activeVocalModel}
               />
             )}
@@ -192,6 +200,35 @@ export default function App() {
         isOpen={Boolean(inspectedVocalModel)}
         onClose={() => setInspectedVocalModel(null)}
         onApplyModel={handleSelectVocalModel}
+      />
+
+      {/* Instrumental Swapper & Acapella Isolator Modal (African Remix Suite) */}
+      <InstrumentalSwapperModal
+        isOpen={isInstrumentalSwapperOpen}
+        onClose={() => setIsInstrumentalSwapperOpen(false)}
+        currentTrack={currentTrack}
+        onSelectTrack={(track) => {
+          setCurrentTrack(track);
+          setActiveTab('studio');
+        }}
+        onApplyPreset={(preset) => {
+          setActivePreset(preset);
+          globalAudioEngine.setTransformation(preset);
+        }}
+        onOpenVideoStudio={() => {
+          setIsInstrumentalSwapperOpen(false);
+          setActiveTab('visuals');
+        }}
+      />
+
+      {/* 16-Step Beat Maker & Drum Machine Modal */}
+      <BeatMakerStudioModal
+        isOpen={isBeatMakerOpen}
+        onClose={() => setIsBeatMakerOpen(false)}
+        onSendBeatToEngine={() => {
+          setIsBeatMakerOpen(false);
+          setActiveTab('studio');
+        }}
       />
     </div>
   );
