@@ -76,6 +76,34 @@ export interface Collaborator {
   currentTrack?: string;
 }
 
+export interface VideoVisualizerSettings {
+  aspectRatio: '16:9' | '9:16' | '1:1';
+  visualMode: 'circular' | 'bars' | 'mirror_bars' | 'oscilloscope' | 'particles' | 'orbit8d' | 'pulse_ring' | 'cassette_vu';
+  wavePosition: 'bottom' | 'lower_third' | 'center' | 'horizon' | 'ambient';
+  colorTheme: string;
+  customColor: string;
+  secondaryColor?: string;
+  sensitivity: number;
+  barCount: number;
+  barWidth: number;
+  glowIntensity: number;
+  waveOpacity: number;
+  backgroundImage: string | null;
+  backgroundPreset: string;
+  backgroundDim: number;
+  backgroundBlur: number;
+  bassPulseBg: boolean;
+  showCoverCenter: boolean;
+  titleText: string;
+  artistText: string;
+  badgeText: string;
+  showWatermark: boolean;
+  watermarkText: string;
+  showLyrics: boolean;
+  lyricsText: string;
+  textPosition: 'bottom_left' | 'center' | 'top_left' | 'bottom_center';
+}
+
 export interface VocalModel {
   id: string;
   name: string;

@@ -9,7 +9,8 @@ import {
   Award, 
   Activity, 
   X,
-  Volume2
+  Volume2,
+  Video
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset } from '../../types';
 import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
@@ -155,6 +156,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <Sparkles className="w-4 h-4" />
                 MAKE IT A VIBE
+              </button>
+
+              <button
+                onClick={() => onNavigateTab('visuals')}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#260e10] hover:bg-[#381417] text-[#ff8085] hover:text-white border border-[#4a1c20] text-xs font-bold transition-all shadow-md active:scale-95"
+              >
+                <Video className="w-3.5 h-3.5" />
+                HD Video Studio
               </button>
             </div>
           </div>

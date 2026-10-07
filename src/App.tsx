@@ -108,6 +108,7 @@ export default function App() {
                 onUpdatePreset={setActivePreset}
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
                 onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+                onOpenVideoStudio={() => setActiveTab('visuals')}
                 activeVocalModel={activeVocalModel}
               />
             )}
@@ -127,6 +128,7 @@ export default function App() {
               <VisualizerStudioView
                 currentTrack={currentTrack}
                 activePreset={activePreset}
+                onSelectTrack={setCurrentTrack}
               />
             )}
 

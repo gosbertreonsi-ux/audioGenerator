@@ -16,6 +16,7 @@ export class MusicAudioEngine {
   private compressor: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
   private masterGain: GainNode | null = null;
+  private mediaStreamDest: MediaStreamAudioDestinationNode | null = null;
 
   // 8D Animation
   private panAngle = 0;
@@ -84,6 +85,24 @@ export class MusicAudioEngine {
 
   public getAudioContext(): AudioContext | null {
     return this.ctx;
+  }
+
+  public getAudioMediaStream(): MediaStream | null {
+    if (this.mediaStreamDest) {
+      return this.mediaStreamDest.stream;
+    }
+    if (this.ctx && typeof this.ctx.createMediaStreamDestination === 'function') {
+      try {
+        this.mediaStreamDest = this.ctx.createMediaStreamDestination();
+        if (this.masterGain) {
+          this.masterGain.connect(this.mediaStreamDest);
+        }
+        return this.mediaStreamDest.stream;
+      } catch (err) {
+        console.warn('Could not create MediaStreamDestination', err);
+      }
+    }
+    return null;
   }
 
   // Generate synthetic high-quality demo track (Synthwave / Lo-fi Night Drive)
@@ -282,6 +301,16 @@ export class MusicAudioEngine {
     this.compressor.connect(this.analyser);
     this.analyser.connect(this.masterGain);
     this.masterGain.connect(ctx.destination);
+
+    // Audio MediaStream Destination for HD Video Recording
+    try {
+      if (typeof ctx.createMediaStreamDestination === 'function') {
+        this.mediaStreamDest = ctx.createMediaStreamDestination();
+        this.masterGain.connect(this.mediaStreamDest);
+      }
+    } catch (err) {
+      console.warn('MediaStreamDestination init notice:', err);
+    }
 
     // Start 8D LFO panning animation if enabled
     this.start8DAnimation();

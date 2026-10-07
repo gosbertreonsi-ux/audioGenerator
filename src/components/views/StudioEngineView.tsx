@@ -12,7 +12,8 @@ import {
   Headphones, 
   Flame, 
   Check, 
-  Loader2
+  Loader2,
+  Video
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset, VocalModel } from '../../types';
 import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
@@ -27,6 +28,7 @@ interface StudioEngineViewProps {
   onUpdatePreset: (preset: TransformationPreset) => void;
   onOpenMakeItAVibe: () => void;
   onOpenVocalModels?: () => void;
+  onOpenVideoStudio?: () => void;
   activeVocalModel?: VocalModel | null;
 }
 
@@ -37,6 +39,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   onUpdatePreset,
   onOpenMakeItAVibe,
   onOpenVocalModels,
+  onOpenVideoStudio,
   activeVocalModel,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -787,9 +790,15 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
               <Activity className="w-4 h-4 text-[#ea3838]" />
               LIVE AUDIO VISUALIZER
             </h3>
-            <span className="text-[11px] text-[#ff6b72] font-semibold">
-              60 FPS Web Audio
-            </span>
+            {onOpenVideoStudio && (
+              <button
+                onClick={onOpenVideoStudio}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#280e10] hover:bg-[#ea3838] text-white border border-[#4a1c20] text-xs font-bold transition-all shadow-md active:scale-95"
+              >
+                <Video className="w-3.5 h-3.5 text-[#ff6b72]" />
+                <span>HD Video Studio →</span>
+              </button>
+            )}
           </div>
 
           <AudioVisualizerCanvas
