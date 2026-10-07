@@ -88,6 +88,7 @@ export class MusicAudioEngine {
   }
 
   public getAudioMediaStream(): MediaStream | null {
+    this.initContext();
     if (this.mediaStreamDest) {
       return this.mediaStreamDest.stream;
     }
@@ -95,7 +96,11 @@ export class MusicAudioEngine {
       try {
         this.mediaStreamDest = this.ctx.createMediaStreamDestination();
         if (this.masterGain) {
-          this.masterGain.connect(this.mediaStreamDest);
+          try {
+            this.masterGain.connect(this.mediaStreamDest);
+          } catch {
+            // Already connected or destination ready
+          }
         }
         return this.mediaStreamDest.stream;
       } catch (err) {
