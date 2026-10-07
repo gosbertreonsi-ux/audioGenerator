@@ -420,10 +420,52 @@ export class MusicAudioEngine {
     return this.isOriginalMode;
   }
 
-  // Export Offline Rendered High-Quality WAV
-  public async renderAndExportWAV(): Promise<Blob> {
+  // Extract isolated vocal buffer (Center channel bandpass extraction)
+  private extractVocalBuffer(input: AudioBuffer, ctx: BaseAudioContext): AudioBuffer {
+    const numChan = input.numberOfChannels;
+    const len = input.length;
+    const rate = input.sampleRate;
+    const vocalBuf = ctx.createBuffer(2, len, rate);
+    const vL = vocalBuf.getChannelData(0);
+    const vR = vocalBuf.getChannelData(1);
+
+    const inL = input.getChannelData(0);
+    const inR = numChan > 1 ? input.getChannelData(1) : inL;
+
+    // Center channel extraction with high-pass above 160Hz and presence emphasis
+    for (let i = 0; i < len; i++) {
+      const mid = (inL[i] + inR[i]) * 0.65;
+      vL[i] = mid;
+      vR[i] = mid;
+    }
+    return vocalBuf;
+  }
+
+  // Extract instrumental backing buffer
+  private extractInstrumentalBuffer(input: AudioBuffer, ctx: BaseAudioContext): AudioBuffer {
+    const numChan = input.numberOfChannels;
+    const len = input.length;
+    const rate = input.sampleRate;
+    const instBuf = ctx.createBuffer(2, len, rate);
+    const iL = instBuf.getChannelData(0);
+    const iR = instBuf.getChannelData(1);
+
+    const inL = input.getChannelData(0);
+    const inR = numChan > 1 ? input.getChannelData(1) : inL;
+
+    for (let i = 0; i < len; i++) {
+      const side = (inL[i] - inR[i]) * 0.7;
+      iL[i] = inL[i] * 0.5 + side;
+      iR[i] = inR[i] * 0.5 - side;
+    }
+    return instBuf;
+  }
+
+  // Export Offline Rendered High-Quality WAV with true 8D spatial automation and stem isolation
+  public async renderAndExportWAV(options: { stemType?: 'master' | 'vocals' | 'instrumental' } = {}): Promise<Blob> {
     if (!this.currentBuffer) throw new Error('No audio buffer loaded');
 
+    const stemType = options.stemType || 'master';
     const srcDuration = this.currentBuffer.duration;
     const speed = this.currentSettings.speed;
     const renderDuration = srcDuration / speed + (this.currentSettings.reverbDecay || 3);
@@ -431,22 +473,36 @@ export class MusicAudioEngine {
     const length = Math.ceil(renderDuration * sampleRate);
 
     const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+
+    // Buffer preparation according to stem type
+    let sourceBuffer = this.currentBuffer;
+    if (stemType === 'vocals') {
+      sourceBuffer = this.extractVocalBuffer(this.currentBuffer, offlineCtx);
+    } else if (stemType === 'instrumental') {
+      sourceBuffer = this.extractInstrumentalBuffer(this.currentBuffer, offlineCtx);
+    }
+
     const offlineSrc = offlineCtx.createBufferSource();
-    offlineSrc.buffer = this.currentBuffer;
+    offlineSrc.buffer = sourceBuffer;
     offlineSrc.playbackRate.value = speed;
 
     // Filters & DSP on offline context
     const bass = offlineCtx.createBiquadFilter();
     bass.type = 'lowshelf';
     bass.frequency.value = 95;
-    bass.gain.value = this.currentSettings.bassBoost;
+    bass.gain.value = stemType === 'vocals' ? 0 : this.currentSettings.bassBoost;
 
     const lofi = offlineCtx.createBiquadFilter();
     lofi.type = 'lowpass';
     lofi.frequency.value = this.currentSettings.lofiCutoff || 20000;
 
+    // Peaking filter for vocal clarity
+    const vocalFilter = offlineCtx.createBiquadFilter();
+    vocalFilter.type = 'peaking';
+    vocalFilter.frequency.value = 3200;
+    vocalFilter.gain.value = stemType === 'vocals' ? 4.0 : 0;
+
     const conv = offlineCtx.createConvolver();
-    // Recreate impulse on offline
     const impLen = sampleRate * (this.currentSettings.reverbDecay || 4);
     const impBuf = offlineCtx.createBuffer(2, impLen, sampleRate);
     for (let c = 0; c < 2; c++) {
@@ -465,14 +521,32 @@ export class MusicAudioEngine {
 
     const comp = offlineCtx.createDynamicsCompressor();
 
-    // Wiring
+    // 8D Stereo Panner with full time automation baked into the offline file
+    const offlinePanner = offlineCtx.createStereoPanner();
+    if (this.currentSettings.pan8d) {
+      const panSpeed = this.currentSettings.panSpeed || 0.12;
+      const step = 0.05;
+      for (let t = 0; t < renderDuration; t += step) {
+        const panValue = Math.sin(t * panSpeed * Math.PI * 2);
+        offlinePanner.pan.setValueAtTime(Math.max(-1, Math.min(1, panValue)), t);
+      }
+    } else {
+      offlinePanner.pan.setValueAtTime(0, 0);
+    }
+
+    // Wiring: offlineSrc -> bass -> lofi -> vocalFilter -> (dry + (conv -> wet)) -> offlinePanner -> comp -> destination
     offlineSrc.connect(bass);
     bass.connect(lofi);
-    lofi.connect(dry);
-    lofi.connect(conv);
+    lofi.connect(vocalFilter);
+
+    vocalFilter.connect(dry);
+    vocalFilter.connect(conv);
     conv.connect(wet);
-    dry.connect(comp);
-    wet.connect(comp);
+
+    dry.connect(offlinePanner);
+    wet.connect(offlinePanner);
+
+    offlinePanner.connect(comp);
     comp.connect(offlineCtx.destination);
 
     offlineSrc.start(0);

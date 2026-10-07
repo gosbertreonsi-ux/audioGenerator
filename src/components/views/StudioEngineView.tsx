@@ -14,10 +14,11 @@ import {
   Check, 
   Loader2
 } from 'lucide-react';
-import { AudioTrack, TransformationPreset } from '../../types';
+import { AudioTrack, TransformationPreset, VocalModel } from '../../types';
 import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
 import { globalAudioEngine } from '../../lib/audioEngine';
 import { AudioVisualizerCanvas } from '../AudioVisualizerCanvas';
+import { DownloadStemsModal } from '../DownloadStemsModal';
 
 interface StudioEngineViewProps {
   currentTrack: AudioTrack;
@@ -26,6 +27,7 @@ interface StudioEngineViewProps {
   onUpdatePreset: (preset: TransformationPreset) => void;
   onOpenMakeItAVibe: () => void;
   onOpenVocalModels?: () => void;
+  activeVocalModel?: VocalModel | null;
 }
 
 export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
@@ -35,6 +37,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   onUpdatePreset,
   onOpenMakeItAVibe,
   onOpenVocalModels,
+  activeVocalModel,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -43,6 +46,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isExportingWav, setIsExportingWav] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
+  const [isDownloadStemsOpen, setIsDownloadStemsOpen] = useState(false);
 
   // Custom AI prompt state
   const [customPrompt, setCustomPrompt] = useState('');
@@ -347,12 +351,12 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
             </button>
           </div>
 
-          {/* Export WAV button */}
-          <div className="flex items-center gap-3">
+          {/* Export WAV & Stems buttons */}
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={handleExportWAV}
               disabled={isExportingWav}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               {isExportingWav ? (
                 <>
@@ -367,10 +371,200 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
               ) : (
                 <>
                   <Download className="w-4 h-4 text-[#ff6b72]" />
-                  Export Master WAV
+                  Quick Master WAV
                 </>
               )}
             </button>
+
+            {/* Download Stems & Edited Vocals Button (Requested by user) */}
+            <button
+              onClick={() => setIsDownloadStemsOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ea3838] to-[#ff5252] text-white text-xs font-black shadow-lg shadow-[#ea3838]/40 hover:scale-105 transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Download Stems & Edited Vocals
+            </button>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            MULTI-STYLE MIXER & STACKER (Section 12: Combine Multiple Styles Simultaneously)
+           ========================================================================= */}
+        <div className="p-4 rounded-2xl bg-[#17080a] border border-[#3e1618] space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#ea3838]" />
+              <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                STYLE MIXER & MULTI-LAYER STACKER
+              </h3>
+            </div>
+            <span className="text-[11px] text-[#a67c7f]">
+              Combine multiple effects simultaneously (e.g. Slowed + Reverb + 8D + Lo-Fi + Vocal Model)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            {/* Layer 1: Slowed */}
+            <button
+              onClick={() => {
+                const isSlow = activePreset.speed < 0.9;
+                handleParamChange('speed', isSlow ? 1.0 : 0.72);
+                handleParamChange('pitch', isSlow ? 0 : -3.0);
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                activePreset.speed < 0.9
+                  ? 'bg-[#2f1013] border-[#ea3838] text-white shadow-md shadow-[#ea3838]/20'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span>Slowed</span>
+                {activePreset.speed < 0.9 && <Check className="w-3.5 h-3.5 text-[#ff6b72]" />}
+              </div>
+              <span className="text-[10px] text-[#8a686b] block mt-0.5">{(activePreset.speed * 100).toFixed(0)}% Speed</span>
+            </button>
+
+            {/* Layer 2: Cathedral Reverb */}
+            <button
+              onClick={() => {
+                const hasVerb = activePreset.reverbWet > 0.3;
+                handleParamChange('reverbWet', hasVerb ? 0.05 : 0.6);
+                handleParamChange('reverbDecay', hasVerb ? 1.0 : 5.8);
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                activePreset.reverbWet > 0.3
+                  ? 'bg-[#2f1013] border-[#ea3838] text-white shadow-md shadow-[#ea3838]/20'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span>Reverb</span>
+                {activePreset.reverbWet > 0.3 && <Check className="w-3.5 h-3.5 text-[#ff6b72]" />}
+              </div>
+              <span className="text-[10px] text-[#8a686b] block mt-0.5">{(activePreset.reverbWet * 100).toFixed(0)}% Wet</span>
+            </button>
+
+            {/* Layer 3: 8D Audio (8D Tunes) */}
+            <button
+              onClick={() => {
+                handleParamChange('pan8d', !activePreset.pan8d);
+                if (!activePreset.pan8d) handleParamChange('panSpeed', 0.12);
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                activePreset.pan8d
+                  ? 'bg-[#1b2b20] border-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-1">
+                  <Headphones className="w-3 h-3 text-emerald-400" />
+                  8D Audio
+                </span>
+                {activePreset.pan8d && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+              </div>
+              <span className="text-[10px] text-emerald-400/80 block mt-0.5">360° Orbit</span>
+            </button>
+
+            {/* Layer 4: Lo-Fi Warmth */}
+            <button
+              onClick={() => {
+                const isLofi = (activePreset.lofiCutoff || 20000) < 10000;
+                handleParamChange('lofiCutoff', isLofi ? 20000 : 3800);
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                (activePreset.lofiCutoff || 20000) < 10000
+                  ? 'bg-[#2f1013] border-[#ea3838] text-white shadow-md shadow-[#ea3838]/20'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span>Lo-Fi</span>
+                {(activePreset.lofiCutoff || 20000) < 10000 && <Check className="w-3.5 h-3.5 text-[#ff6b72]" />}
+              </div>
+              <span className="text-[10px] text-[#8a686b] block mt-0.5">3.8kHz Cassette</span>
+            </button>
+
+            {/* Layer 5: Sub-Bass Boost */}
+            <button
+              onClick={() => {
+                const hasBass = activePreset.bassBoost > 3;
+                handleParamChange('bassBoost', hasBass ? 0 : 6.5);
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                activePreset.bassBoost > 3
+                  ? 'bg-[#2f1013] border-[#ea3838] text-white shadow-md shadow-[#ea3838]/20'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span>Bass Boost</span>
+                {activePreset.bassBoost > 3 && <Check className="w-3.5 h-3.5 text-[#ff6b72]" />}
+              </div>
+              <span className="text-[10px] text-[#8a686b] block mt-0.5">+{activePreset.bassBoost.toFixed(0)} dB</span>
+            </button>
+
+            {/* Layer 6: Selected Vocal Model */}
+            <button
+              onClick={onOpenVocalModels}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                activeVocalModel
+                  ? 'bg-[#351216] border-[#ea3838] text-white shadow-md shadow-[#ea3838]/30'
+                  : 'bg-[#220d0f] border-[#371518] text-[#a67c7f] hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="truncate">{activeVocalModel ? activeVocalModel.name.split(' ')[0] : 'Vocal Model'}</span>
+                {activeVocalModel && <Check className="w-3.5 h-3.5 text-[#ff6b72]" />}
+              </div>
+              <span className="text-[10px] text-[#ff6b72] block mt-0.5 truncate">
+                {activeVocalModel ? activeVocalModel.vocalistArchetype : 'Choose 100+'}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* 8D TUNES OFFICIAL PLAYLIST HUB (https://lnk.to/8dplaylist) */}
+        <div className="p-4 rounded-2xl bg-[#1b080a] border border-[#ea3838]/40 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Headphones className="w-4 h-4 text-[#ea3838]" />
+              <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                8D TUNES OFFICIAL PLAYLIST (LNK.TO/8DPLAYLIST)
+              </h4>
+            </div>
+            <a
+              href="https://lnk.to/8dplaylist"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-bold text-[#ff6b72] hover:underline"
+            >
+              Official Link ↗
+            </a>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {SAMPLE_TRACKS.filter((t) => t.id.startsWith('8d-')).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  onUpdateTrack(t);
+                  // Load synthetic track and activate 8D preset
+                  globalAudioEngine.loadSyntheticTrack('midnight_drive');
+                  const eightDPreset = PRESET_STYLES.find((p) => p.id === '8d_tunes_signature') || PRESET_STYLES[0];
+                  onUpdatePreset(eightDPreset);
+                  globalAudioEngine.setTransformation(eightDPreset);
+                  globalAudioEngine.play();
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
+                  currentTrack.id === t.id
+                    ? 'bg-[#ea3838] text-white border-[#ea3838] shadow-md shadow-[#ea3838]/30'
+                    : 'bg-[#240c0e] text-[#c59c9f] hover:text-white border-[#371518]'
+                }`}
+              >
+                {t.title}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -655,6 +849,21 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
           })}
         </div>
       </div>
+
+      {/* Stems & Vocals Download Modal */}
+      <DownloadStemsModal
+        isOpen={isDownloadStemsOpen}
+        onClose={() => setIsDownloadStemsOpen(false)}
+        track={currentTrack}
+        preset={activePreset}
+        activeVocalModel={activeVocalModel}
+        activeStackSummary={[
+          activePreset.speed < 0.9 ? `Slowed (${(activePreset.speed * 100).toFixed(0)}%)` : activePreset.speed > 1.1 ? `Sped Up (${(activePreset.speed * 100).toFixed(0)}%)` : 'Standard Tempo',
+          activePreset.reverbWet > 0.2 ? `Cathedral Reverb (${(activePreset.reverbWet * 100).toFixed(0)}%)` : null,
+          (activePreset.lofiCutoff || 20000) < 10000 ? 'Lo-Fi Tape (3.8kHz)' : null,
+          activePreset.bassBoost > 3 ? `Sub-Bass (+${activePreset.bassBoost.toFixed(0)}dB)` : null,
+        ].filter(Boolean) as string[]}
+      />
     </div>
   );
 };

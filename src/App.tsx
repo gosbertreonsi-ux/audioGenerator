@@ -108,6 +108,7 @@ export default function App() {
                 onUpdatePreset={setActivePreset}
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
                 onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+                activeVocalModel={activeVocalModel}
               />
             )}
 
