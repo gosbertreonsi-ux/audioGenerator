@@ -12,7 +12,7 @@ interface HeaderBarProps {
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
-  userName = 'NIKITIN',
+  userName = 'LEONCE',
   searchQuery,
   onSearchChange,
   activeExportsCount = 3,

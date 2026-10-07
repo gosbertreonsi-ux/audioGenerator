@@ -269,7 +269,7 @@ export const PRESET_STYLES: TransformationPreset[] = [
 export const COMMUNITY_CREATORS: Collaborator[] = [
   {
     id: 'c-1',
-    name: 'Nikitin',
+    name: 'Leonce',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
     role: 'Lead Producer',
     status: 'In Studio',

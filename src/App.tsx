@@ -30,7 +30,7 @@ export default function App() {
   const [isVocalModelsOpen, setIsVocalModelsOpen] = useState(false);
   const [inspectedVocalModel, setInspectedVocalModel] = useState<VocalModel | null>(null);
   const [activeVocalModel, setActiveVocalModel] = useState<VocalModel | null>(null);
-  const [userName, setUserName] = useState('NIKITIN');
+  const [userName, setUserName] = useState('LEONCE');
 
   const handleSelectVocalModel = (model: VocalModel) => {
     setActiveVocalModel(model);
