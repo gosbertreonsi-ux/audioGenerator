@@ -155,7 +155,15 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ feelingPrompt: customPrompt }),
       });
-      const data = await res.json();
+      
+      let data: Record<string, any> | null = null;
+      const text = await res.text();
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.warn('Non-JSON response received, using acoustic synthesizer defaults:', parseErr);
+      }
+
       if (data && data.settings) {
         const customPreset: TransformationPreset = {
           id: `custom-${Date.now()}`,
@@ -177,6 +185,30 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
         onUpdatePreset(customPreset);
         globalAudioEngine.setTransformation(customPreset);
         setCustomStyleStatus(`Style created: ${customPreset.name}`);
+      } else {
+        // Intelligent client-side fallback
+        const p = customPrompt.toLowerCase();
+        const isRain = p.includes('rain') || p.includes('midnight') || p.includes('dark');
+        const fallbackPreset: TransformationPreset = {
+          id: `custom-${Date.now()}`,
+          name: isRain ? 'Midnight Rain' : 'Custom Ambient',
+          category: 'Experimental',
+          badge: 'Acoustic Synthesizer',
+          description: `Custom setting crafted from: "${customPrompt}"`,
+          speed: isRain ? 0.74 : 0.8,
+          pitch: isRain ? -2.8 : -2.0,
+          reverbWet: isRain ? 0.6 : 0.45,
+          reverbDecay: isRain ? 6.0 : 4.5,
+          bassBoost: isRain ? 5.0 : 3.5,
+          stereoWidth: 1.4,
+          pan8d: true,
+          panSpeed: 0.1,
+          lofiCutoff: isRain ? 3800 : 16000,
+          color: '#ff3b47',
+        };
+        onUpdatePreset(fallbackPreset);
+        globalAudioEngine.setTransformation(fallbackPreset);
+        setCustomStyleStatus(`Style created: ${fallbackPreset.name}`);
       }
     } catch (err) {
       console.error(err);

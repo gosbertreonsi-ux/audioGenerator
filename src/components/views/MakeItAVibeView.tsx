@@ -58,8 +58,16 @@ export const MakeItAVibeView: React.FC<MakeItAVibeViewProps> = ({
           genre: currentTrack.genre,
         }),
       });
-      const data = await res.json();
-      setContentPack(data);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.warn('Fallback content pack used:', err);
+      }
+      if (data && data.youtubeTitle) {
+        setContentPack(data);
+      }
     } catch (err) {
       console.error(err);
     } finally {

@@ -48,8 +48,16 @@ export const RightsCenterView: React.FC<RightsCenterViewProps> = ({ currentTrack
           notes: userNotes,
         }),
       });
-      const data = await res.json();
-      setAssessment(data);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.warn('Fallback rights assessment used:', err);
+      }
+      if (data && data.status) {
+        setAssessment(data);
+      }
     } catch (err) {
       console.error(err);
     } finally {
