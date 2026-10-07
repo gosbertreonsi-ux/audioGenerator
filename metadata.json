@@ -1,0 +1,6 @@
+{
+  "name": "MusicMotion AI",
+  "description": "AI-powered music transformation, style mixer, real-time audio visualizer, and multi-platform content creation platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

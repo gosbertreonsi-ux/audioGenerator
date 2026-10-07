@@ -1,0 +1,648 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Play, 
+  Pause, 
+  RotateCcw, 
+  Download, 
+  Sparkles, 
+  Upload, 
+  Layers, 
+  Sliders, 
+  Activity, 
+  Headphones, 
+  Flame, 
+  Check, 
+  Loader2
+} from 'lucide-react';
+import { AudioTrack, TransformationPreset } from '../../types';
+import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
+import { globalAudioEngine } from '../../lib/audioEngine';
+import { AudioVisualizerCanvas } from '../AudioVisualizerCanvas';
+
+interface StudioEngineViewProps {
+  currentTrack: AudioTrack;
+  onUpdateTrack: (track: AudioTrack) => void;
+  activePreset: TransformationPreset;
+  onUpdatePreset: (preset: TransformationPreset) => void;
+  onOpenMakeItAVibe: () => void;
+}
+
+export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
+  currentTrack,
+  onUpdateTrack,
+  activePreset,
+  onUpdatePreset,
+  onOpenMakeItAVibe,
+}) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(currentTrack.duration);
+  const [isABOriginal, setIsABOriginal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [isExportingWav, setIsExportingWav] = useState(false);
+  const [exportComplete, setExportComplete] = useState(false);
+
+  // Custom AI prompt state
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [isAiGeneratingStyle, setIsAiGeneratingStyle] = useState(false);
+  const [customStyleStatus, setCustomStyleStatus] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Audio Engine synchronization
+  useEffect(() => {
+    const unsub = globalAudioEngine.subscribe((state) => {
+      setIsPlaying(state.isPlaying);
+      setCurrentTime(state.currentTime);
+      if (state.duration > 0) {
+        setDuration(state.duration);
+      }
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
+
+  const handlePlayToggle = async () => {
+    const ctx = globalAudioEngine.getAudioContext();
+    if (!ctx) {
+      await globalAudioEngine.loadSyntheticTrack('midnight_drive');
+    }
+    globalAudioEngine.togglePlay();
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const target = parseFloat(e.target.value);
+    setCurrentTime(target);
+    globalAudioEngine.seek(target);
+  };
+
+  const handleABToggle = () => {
+    const nextMode = !isABOriginal;
+    setIsABOriginal(nextMode);
+    globalAudioEngine.setABMode(nextMode);
+  };
+
+  const handleParamChange = (key: keyof TransformationPreset, val: unknown) => {
+    const updated = { ...activePreset, [key]: val };
+    onUpdatePreset(updated);
+    globalAudioEngine.setTransformation(updated);
+  };
+
+  // Upload custom audio file
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const decodedBuffer = await globalAudioEngine.loadAudioFile(file);
+      const newTrack: AudioTrack = {
+        id: `upload-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        artist: 'User Upload',
+        duration: Math.round(decodedBuffer.duration),
+        bpm: 120, // default detected
+        key: 'G Minor',
+        energy: 'High',
+        vocals: 'Detected',
+        lufs: -10.2,
+        genre: 'Custom Audio',
+        coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+        sourceType: 'user_upload',
+      };
+      onUpdateTrack(newTrack);
+      setDuration(decodedBuffer.duration);
+      globalAudioEngine.play();
+    } catch (err) {
+      console.error('Failed to decode file:', err);
+    }
+  };
+
+  // Export processed WAV file
+  const handleExportWAV = async () => {
+    try {
+      setIsExportingWav(true);
+      const wavBlob = await globalAudioEngine.renderAndExportWAV();
+      const url = URL.createObjectURL(wavBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTrack.title.replace(/\s+/g, '_')}_${activePreset.name.replace(/\s+/g, '_')}.wav`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setExportComplete(true);
+      setTimeout(() => setExportComplete(false), 3000);
+    } catch (err) {
+      console.error('Failed to render WAV:', err);
+    } finally {
+      setIsExportingWav(false);
+    }
+  };
+
+  // Generate Custom Style from AI Natural Language prompt
+  const handleGenerateCustomStyle = async () => {
+    if (!customPrompt.trim()) return;
+    setIsAiGeneratingStyle(true);
+    setCustomStyleStatus(null);
+    try {
+      const res = await fetch('/api/gemini/custom-style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feelingPrompt: customPrompt }),
+      });
+      const data = await res.json();
+      if (data && data.settings) {
+        const customPreset: TransformationPreset = {
+          id: `custom-${Date.now()}`,
+          name: data.styleName || 'Custom Mood',
+          category: 'Experimental',
+          badge: data.soundProfile || 'AI Crafted',
+          description: data.description || 'Sonic treatment crafted by Gemini AI from your feeling prompt.',
+          speed: data.settings.speed || 0.75,
+          pitch: data.settings.pitch || -2.5,
+          reverbWet: data.settings.reverbWet || 0.5,
+          reverbDecay: data.settings.reverbDecay || 5.0,
+          bassBoost: data.settings.bassBoost || 4.0,
+          stereoWidth: data.settings.stereoWidth || 1.3,
+          pan8d: Boolean(data.settings.pan8d),
+          panSpeed: data.settings.panSpeed || 0.1,
+          lofiCutoff: data.settings.lofiCutoff || 14000,
+          color: '#ff3b47',
+        };
+        onUpdatePreset(customPreset);
+        globalAudioEngine.setTransformation(customPreset);
+        setCustomStyleStatus(`Style created: ${customPreset.name}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setCustomStyleStatus('Applied fallback custom parameters.');
+    } finally {
+      setIsAiGeneratingStyle(false);
+    }
+  };
+
+  const categories = ['All', 'Slowed', 'Sped Up', 'Spatial', 'Reverb', 'Bass', 'Atmosphere', 'Retro', 'Experimental'];
+  const filteredPresets = selectedCategory === 'All'
+    ? PRESET_STYLES
+    : PRESET_STYLES.filter((p) => p.category === selectedCategory);
+
+  const formatSeconds = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${mins}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className="flex-1 p-5 md:p-7 overflow-y-auto space-y-6 select-none bg-[#140708] text-[#f4e8e8]">
+      {/* Hidden file input for uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
+      {/* TOP BAR: TRACK SUMMARY & UPLOAD */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-3xl bg-[#1b090b] border border-[#371518] shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="relative w-16 h-16 rounded-2xl overflow-hidden border border-[#441619] shrink-0">
+            <img
+              src={currentTrack.coverUrl}
+              alt={currentTrack.title}
+              className="w-full h-full object-cover"
+            />
+            {isPlaying && (
+              <div className="absolute inset-0 bg-[#ea3838]/30 flex items-center justify-center">
+                <Activity className="w-6 h-6 text-white animate-pulse" />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-black text-white">
+                {currentTrack.title}
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ea3838] text-white">
+                {currentTrack.sourceType === 'preset_stem' ? 'STUDIO STEM' : 'UPLOADED FILE'}
+              </span>
+            </div>
+            <p className="text-xs text-[#a67c7f] mt-0.5">
+              {currentTrack.artist} · {currentTrack.genre}
+            </p>
+
+            {/* Analysis Badges (Section 9) */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-[#c59c9f]">
+              <span className="font-semibold text-white">BPM: {currentTrack.bpm}</span>
+              <span>·</span>
+              <span className="font-semibold text-white">KEY: {currentTrack.key}</span>
+              <span>·</span>
+              <span className="font-semibold text-white">LUFS: {currentTrack.lufs}</span>
+              <span>·</span>
+              <span className="text-emerald-400 font-semibold">VOCALS: {currentTrack.vocals}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] text-xs font-bold transition-all shadow-md active:scale-95"
+          >
+            <Upload className="w-3.5 h-3.5 text-[#ff6b72]" />
+            Upload Song
+          </button>
+
+          <button
+            onClick={onOpenMakeItAVibe}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff5252] text-white text-xs font-extrabold shadow-lg shadow-[#ea3838]/40 transition-all active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Make It A Vibe
+          </button>
+        </div>
+      </div>
+
+      {/* WAVEFORM, PLAYBACK CONTROLS & A/B COMPARISON */}
+      <div className="p-5 rounded-3xl bg-[#1b090b] border border-[#371518] shadow-xl space-y-4">
+        {/* Waveform Visual Scrub Bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs font-mono text-[#a67c7f]">
+            <span>{formatSeconds(currentTime)}</span>
+            <span className="flex items-center gap-2">
+              {isABOriginal ? (
+                <span className="text-amber-400 font-bold">A: ORIGINAL (DRY AUDIO)</span>
+              ) : (
+                <span className="text-[#ff6b72] font-bold">B: EDITED ({activePreset.name.toUpperCase()})</span>
+              )}
+            </span>
+            <span>{formatSeconds(duration || currentTrack.duration)}</span>
+          </div>
+
+          <div className="relative flex items-center">
+            <input
+              type="range"
+              min="0"
+              max={duration || currentTrack.duration}
+              step="0.1"
+              value={currentTime}
+              onChange={handleSeek}
+              className="w-full h-2 rounded-lg bg-[#2a0e11] accent-[#ea3838] cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* Master Transport Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+          <div className="flex items-center gap-3">
+            {/* Play/Pause */}
+            <button
+              onClick={handlePlayToggle}
+              className="w-12 h-12 rounded-2xl bg-[#ea3838] hover:bg-[#ff4d4d] text-white flex items-center justify-center shadow-lg shadow-[#ea3838]/40 transition-all active:scale-90"
+            >
+              {isPlaying ? (
+                <Pause className="w-5 h-5" />
+              ) : (
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              )}
+            </button>
+
+            {/* Restart */}
+            <button
+              onClick={() => {
+                globalAudioEngine.seek(0);
+                setCurrentTime(0);
+              }}
+              className="p-3 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-[#c59c9f] hover:text-white border border-[#441619] transition-colors"
+              title="Restart from beginning"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            {/* A/B Switch Button (Section 14 & 15) */}
+            <button
+              onClick={handleABToggle}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-xs font-black transition-all ${
+                isABOriginal
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md shadow-amber-500/20'
+                  : 'bg-[#260e10] text-[#ff6b72] border-[#ea3838]/60 hover:bg-[#381417]'
+              }`}
+              title="Toggle to compare original dry audio against processed sound"
+            >
+              <span className="w-2 h-2 rounded-full bg-current animate-ping" />
+              A/B: {isABOriginal ? 'HEARING ORIGINAL' : 'HEARING EDITED'}
+            </button>
+          </div>
+
+          {/* Export WAV button */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportWAV}
+              disabled={isExportingWav}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              {isExportingWav ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#ff6b72]" />
+                  Rendering 32-bit DSP...
+                </>
+              ) : exportComplete ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  Downloaded WAV!
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-[#ff6b72]" />
+                  Export Master WAV
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* TWO COLUMNS: STYLE DNA PARAMETERS & LIVE CANVAS VISUALIZER */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left: Parametric Style DNA Knobs (Cols 7) */}
+        <div className="lg:col-span-7 p-5 rounded-3xl bg-[#1b090b] border border-[#371518] shadow-xl space-y-5">
+          <div className="flex items-center justify-between border-b border-[#2d1013] pb-3">
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[#ea3838]" />
+              <h3 className="text-sm font-bold text-white tracking-wide">
+                STYLE DNA PARAMETERS ({activePreset.name})
+              </h3>
+            </div>
+            <span className="text-[11px] text-[#8a686b]">
+              Real-time Web Audio DSP
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Speed slider */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold text-white">Speed / Tempo</span>
+                <span className="font-mono text-[#ff6b72]">{(activePreset.speed * 100).toFixed(0)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="1.6"
+                step="0.02"
+                value={activePreset.speed}
+                onChange={(e) => handleParamChange('speed', parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-[#140708] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+              <span className="text-[10px] text-[#8a686b] block">Range: 50% (Ultra Slowed) to 160% (Hyper Speed)</span>
+            </div>
+
+            {/* Pitch slider */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold text-white">Pitch Transpose</span>
+                <span className="font-mono text-[#ff6b72]">{activePreset.pitch > 0 ? `+${activePreset.pitch}` : activePreset.pitch} st</span>
+              </div>
+              <input
+                type="range"
+                min="-8"
+                max="8"
+                step="0.5"
+                value={activePreset.pitch}
+                onChange={(e) => handleParamChange('pitch', parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-[#140708] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+              <span className="text-[10px] text-[#8a686b] block">-8 (Deep Drag) to +8 (Nightcore Sparkle)</span>
+            </div>
+
+            {/* Reverb Wetness */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold text-white">Reverb Wetness</span>
+                <span className="font-mono text-[#ff6b72]">{(activePreset.reverbWet * 100).toFixed(0)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="0.9"
+                step="0.05"
+                value={activePreset.reverbWet}
+                onChange={(e) => handleParamChange('reverbWet', parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-[#140708] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+              <span className="text-[10px] text-[#8a686b] block">Dry/Wet Mix Balance</span>
+            </div>
+
+            {/* Reverb Decay */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold text-white">Cathedral Decay</span>
+                <span className="font-mono text-[#ff6b72]">{activePreset.reverbDecay.toFixed(1)}s</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="9.0"
+                step="0.2"
+                value={activePreset.reverbDecay}
+                onChange={(e) => handleParamChange('reverbDecay', parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-[#140708] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+              <span className="text-[10px] text-[#8a686b] block">Acoustic space decay tail</span>
+            </div>
+
+            {/* Bass Boost */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="font-semibold text-white">Sub Bass Boost (95Hz)</span>
+                <span className="font-mono text-[#ff6b72]">+{activePreset.bassBoost.toFixed(1)} dB</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="14"
+                step="0.5"
+                value={activePreset.bassBoost}
+                onChange={(e) => handleParamChange('bassBoost', parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-[#140708] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+              <span className="text-[10px] text-[#8a686b] block">Low-shelf saturation</span>
+            </div>
+
+            {/* 8D Spatial Audio toggle */}
+            <div className="p-3 rounded-2xl bg-[#220d0f] border border-[#371518] space-y-1.5 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Headphones className="w-3.5 h-3.5 text-[#ff6b72]" />
+                  <span className="text-xs font-semibold text-white">8D Spatial Panning</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={activePreset.pan8d}
+                  onChange={(e) => handleParamChange('pan8d', e.target.checked)}
+                  className="w-4 h-4 accent-[#ea3838] rounded cursor-pointer"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-[#8a686b]">Pan Speed:</span>
+                <input
+                  type="range"
+                  min="0.04"
+                  max="0.3"
+                  step="0.02"
+                  value={activePreset.panSpeed}
+                  disabled={!activePreset.pan8d}
+                  onChange={(e) => handleParamChange('panSpeed', parseFloat(e.target.value))}
+                  className="flex-1 h-1 bg-[#140708] rounded accent-[#ea3838] disabled:opacity-40"
+                />
+              </div>
+              <span className="text-[10px] text-[#8a686b]">Binaural 360° circular headphone rotation</span>
+            </div>
+          </div>
+
+          {/* NATURAL LANGUAGE CUSTOM STYLE GENERATOR (Section 13) */}
+          <div className="p-4 rounded-2xl bg-[#17080a] border border-[#371518] space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-white">
+              <Flame className="w-3.5 h-3.5 text-[#ea3838]" />
+              CREATE MY OWN STYLE WITH AI
+            </div>
+            <p className="text-[11px] text-[#a67c7f]">
+              Describe a desired feeling (e.g. &quot;Make this feel like driving alone at midnight during rain&quot;). Gemini AI translates it directly into audio parameters.
+            </p>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. Driving alone at 3AM in Tokyo with heavy rain..."
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGenerateCustomStyle()}
+                className="flex-1 px-3 py-2 rounded-xl bg-[#220d0f] border border-[#3e1618] text-xs text-white placeholder-[#7d595c] focus:outline-none focus:border-[#ea3838]"
+              />
+              <button
+                onClick={handleGenerateCustomStyle}
+                disabled={isAiGeneratingStyle || !customPrompt.trim()}
+                className="px-4 py-2 rounded-xl bg-[#ea3838] hover:bg-[#ff4d4d] text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isAiGeneratingStyle ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                Generate
+              </button>
+            </div>
+
+            {customStyleStatus && (
+              <p className="text-[11px] text-emerald-400 font-medium">
+                ✓ {customStyleStatus}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Real-time Audio Visualizer Studio (Cols 5) */}
+        <div className="lg:col-span-5 p-5 rounded-3xl bg-[#1b090b] border border-[#371518] shadow-xl flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between border-b border-[#2d1013] pb-3">
+            <h3 className="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#ea3838]" />
+              LIVE AUDIO VISUALIZER
+            </h3>
+            <span className="text-[11px] text-[#ff6b72] font-semibold">
+              60 FPS Web Audio
+            </span>
+          </div>
+
+          <AudioVisualizerCanvas
+            trackTitle={currentTrack.title}
+            artist={currentTrack.artist}
+            preset={activePreset}
+            coverUrl={currentTrack.coverUrl}
+            aspectRatio="16:9"
+            visualMode="circular"
+            className="w-full"
+          />
+
+          <div className="text-[11px] text-[#a67c7f] text-center">
+            Pulls live frequency bins directly from Web Audio AnalyserNode. Hover the visualizer for 9:16 and 1:1 aspect switches.
+          </div>
+        </div>
+      </div>
+
+      {/* STYLE LIBRARY CATEGORIES & CARDS (Section 10) */}
+      <div className="p-5 rounded-3xl bg-[#1b090b] border border-[#371518] shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#ea3838]" />
+            <h3 className="text-sm font-bold text-white tracking-wide">
+              TRANSFORMATION STYLE PRESETS ({filteredPresets.length})
+            </h3>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                  selectedCategory === cat
+                    ? 'bg-[#ea3838] text-white shadow-md shadow-[#ea3838]/30'
+                    : 'bg-[#240c0e] text-[#a67c7f] hover:text-white border border-[#371518]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Preset Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 pt-2">
+          {filteredPresets.map((preset) => {
+            const isSelected = activePreset.id === preset.id;
+            return (
+              <div
+                key={preset.id}
+                onClick={() => {
+                  onUpdatePreset(preset);
+                  globalAudioEngine.setTransformation(preset);
+                }}
+                className={`p-3.5 rounded-2xl cursor-pointer border transition-all flex flex-col justify-between min-h-[120px] ${
+                  isSelected
+                    ? 'bg-[#2e1013] border-[#ea3838] shadow-lg shadow-[#ea3838]/25 scale-[1.02]'
+                    : 'bg-[#1e0a0d] hover:bg-[#250d0f] border-[#371518]'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-bold text-[#ff6b72] uppercase tracking-wider">
+                      {preset.category}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-[#290d10] text-[10px] text-[#c59c9f] font-semibold border border-[#441619]">
+                      {preset.badge}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-white mt-1">
+                    {preset.name}
+                  </h4>
+                  <p className="text-[11px] text-[#8a686b] mt-1 line-clamp-2 leading-relaxed">
+                    {preset.description}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-[10px] text-[#c59c9f] border-t border-[#2d1013] pt-2">
+                  <span>Speed: {(preset.speed * 100).toFixed(0)}%</span>
+                  <span>Reverb: {(preset.reverbWet * 100).toFixed(0)}%</span>
+                  {preset.pan8d && <span className="text-[#ff6b72] font-bold">8D Active</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};

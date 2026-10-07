@@ -1,0 +1,147 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from 'react';
+import { NavigationDock, NavTab } from './components/NavigationDock';
+import { HeaderBar } from './components/HeaderBar';
+import { CollaboratorsRail } from './components/CollaboratorsRail';
+import { DashboardView } from './components/views/DashboardView';
+import { StudioEngineView } from './components/views/StudioEngineView';
+import { MakeItAVibeView } from './components/views/MakeItAVibeView';
+import { VisualizerStudioView } from './components/views/VisualizerStudioView';
+import { TrendDiscoveryView } from './components/views/TrendDiscoveryView';
+import { RightsCenterView } from './components/views/RightsCenterView';
+import { PublishingView } from './components/views/PublishingView';
+import { QuickUploadModal } from './components/QuickUploadModal';
+import { SAMPLE_TRACKS, PRESET_STYLES, COMMUNITY_CREATORS } from './lib/constants';
+import { AudioTrack, TransformationPreset } from './types';
+import { globalAudioEngine } from './lib/audioEngine';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [currentTrack, setCurrentTrack] = useState<AudioTrack>(SAMPLE_TRACKS[0]);
+  const [activePreset, setActivePreset] = useState<TransformationPreset>(PRESET_STYLES[0]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
+  const [userName, setUserName] = useState('NIKITIN');
+
+  // Pre-load default synthetic audio engine so sounds are ready instantly
+  useEffect(() => {
+    globalAudioEngine.loadSyntheticTrack('midnight_drive').catch(console.error);
+  }, []);
+
+  return (
+    <div className="min-h-screen w-full bg-[#0a0304] flex items-center justify-center p-0 md:p-3 lg:p-4 font-sans text-[#f4e8e8]">
+      {/* Outer Console Bezel / Tablet Chassis matching the uploaded screenshot */}
+      <div className="w-full h-full lg:h-[95vh] lg:max-w-[1600px] bg-[#140708] rounded-none md:rounded-[36px] lg:rounded-[42px] border-0 md:border-2 border-[#3a1517] shadow-[0_0_70px_rgba(234,56,56,0.18)] flex overflow-hidden relative">
+        {/* Left Navigation Dock */}
+        <NavigationDock
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
+        />
+
+        {/* Center Main Stage */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Header Bar */}
+          <HeaderBar
+            userName={userName}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpenExportsModal={() => setActiveTab('publish')}
+            onOpenProfileModal={() => {
+              const name = prompt('Enter your producer/artist name:', userName);
+              if (name && name.trim()) setUserName(name.trim());
+            }}
+          />
+
+          {/* Active View Switcher */}
+          <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                currentTrack={currentTrack}
+                onSelectTrack={setCurrentTrack}
+                activePreset={activePreset}
+                onSelectPreset={setActivePreset}
+                onNavigateTab={setActiveTab}
+                onOpenMakeItAVibe={() => setActiveTab('vibe')}
+              />
+            )}
+
+            {activeTab === 'studio' && (
+              <StudioEngineView
+                currentTrack={currentTrack}
+                onUpdateTrack={setCurrentTrack}
+                activePreset={activePreset}
+                onUpdatePreset={setActivePreset}
+                onOpenMakeItAVibe={() => setActiveTab('vibe')}
+              />
+            )}
+
+            {activeTab === 'vibe' && (
+              <MakeItAVibeView
+                currentTrack={currentTrack}
+                activePreset={activePreset}
+                onApplyPreset={(p) => {
+                  setActivePreset(p);
+                  globalAudioEngine.setTransformation(p);
+                }}
+              />
+            )}
+
+            {activeTab === 'visuals' && (
+              <VisualizerStudioView
+                currentTrack={currentTrack}
+                activePreset={activePreset}
+              />
+            )}
+
+            {activeTab === 'trends' && (
+              <TrendDiscoveryView
+                onSelectPreset={(p) => {
+                  setActivePreset(p);
+                  globalAudioEngine.setTransformation(p);
+                  setActiveTab('studio');
+                }}
+                onOpenMakeItAVibe={() => setActiveTab('vibe')}
+              />
+            )}
+
+            {activeTab === 'rights' && (
+              <RightsCenterView currentTrack={currentTrack} />
+            )}
+
+            {activeTab === 'publish' && (
+              <PublishingView
+                currentTrack={currentTrack}
+                activePreset={activePreset}
+              />
+            )}
+          </main>
+        </div>
+
+        {/* Right Collaborators Studio Rail */}
+        <CollaboratorsRail
+          collaborators={COMMUNITY_CREATORS}
+          onSelectCollaborator={(c) => {
+            if (c.currentTrack) {
+              setActiveTab('studio');
+            }
+          }}
+        />
+      </div>
+
+      {/* Quick Upload Modal */}
+      <QuickUploadModal
+        isOpen={isQuickUploadOpen}
+        onClose={() => setIsQuickUploadOpen(false)}
+        onSelectTrack={(track) => {
+          setCurrentTrack(track);
+          setActiveTab('studio');
+        }}
+      />
+    </div>
+  );
+}
