@@ -1,30 +1,35 @@
 // Web Audio API DSP Engine for MusicMotion AI
 import { TransformationPreset, StemMode, StemMixLevels } from '../types';
+import { AltareEngine, AltareRemixConfig, DEFAULT_ALTARE_CONFIG } from './altareEngine';
 
 export class MusicAudioEngine {
   private ctx: AudioContext | null = null;
   private currentBuffer: AudioBuffer | null = null;
-  private sourceNode: AudioBufferSourceNode | null = null;
+  private instrumentalBuffer: AudioBuffer | null = null; // Words 100% Muted / Beat only
+  private vocalBuffer: AudioBuffer | null = null; // Beat 100% Muted / Words only
+
+  // Synchronized Multi-Stem Sources & Controls
+  private fullSourceNode: AudioBufferSourceNode | null = null; // 100% Bit-perfect original audio
+  private beatSourceNode: AudioBufferSourceNode | null = null; // Pure instrumental (words muted)
+  private vocalSourceNode: AudioBufferSourceNode | null = null; // Pure vocals (beat muted)
+  private fullGain: GainNode | null = null;
+  private beatGain: GainNode | null = null;
+  private vocalGain: GainNode | null = null;
   
+  // Project Altare-Builder: Future Bass & Wave Automation Engine
+  private isAltareMode: boolean = false;
+  private altareConfig: AltareRemixConfig = { ...DEFAULT_ALTARE_CONFIG };
+  private altareSourceNode: AudioBufferSourceNode | null = null;
+  private vocalChopSourceNode: AudioBufferSourceNode | null = null;
+  private altareGain: GainNode | null = null;
+  private vocalChopGain: GainNode | null = null;
+  private altareArrangementBuffer: AudioBuffer | null = null;
+  private vocalChopBuffer: AudioBuffer | null = null;
+
   // Secondary source for swapped instrumental backing track (Afrobeat, Amapiano, etc.)
   private instrumentalSourceNode: AudioBufferSourceNode | null = null;
   private instrumentalGainNode: GainNode | null = null;
   private instrumentalBufferMap: Map<string, AudioBuffer> = new Map();
-
-  // DSP Nodes: Real-Time Mid/Side Crossover Neural Vocal & Beat Separator
-  private splitterNode: ChannelSplitterNode | null = null;
-  private midSumNode: GainNode | null = null;
-  private sideSumNode: GainNode | null = null;
-  private bassLowpassNode: BiquadFilterNode | null = null;
-  private bassPreserveGainNode: GainNode | null = null;
-  private vocalBandHighpassNode: BiquadFilterNode | null = null;
-  private vocalBandLowpassNode: BiquadFilterNode | null = null;
-  private vocalPeakingNode: BiquadFilterNode | null = null;
-  private vocalMidGainNode: GainNode | null = null;
-  private airHighpassNode: BiquadFilterNode | null = null;
-  private airPreserveGainNode: GainNode | null = null;
-  private sideGainNode: GainNode | null = null;
-  private recombineMergerNode: ChannelMergerNode | null = null;
 
   // Additional FX Nodes
   private bassFilter: BiquadFilterNode | null = null;
@@ -146,6 +151,23 @@ export class MusicAudioEngine {
   // Set Stem Isolation Mode
   public setStemMode(mode: StemMode) {
     this.stemMode = mode;
+    if (mode === 'words_muted') {
+      this.stemMixLevels.vocals = 0.0;
+      this.stemMixLevels.beat = 1.0;
+    } else if (mode === 'words_only') {
+      this.stemMixLevels.vocals = 1.15;
+      this.stemMixLevels.beat = 0.0;
+    } else if (mode === 'beat_only') {
+      this.stemMixLevels.vocals = 0.0;
+      this.stemMixLevels.beat = 1.0;
+    } else if (mode === 'swapped_instrumental') {
+      this.stemMixLevels.beat = 0.0;
+      this.stemMixLevels.vocals = 1.0;
+    } else {
+      this.stemMixLevels.vocals = 1.0;
+      this.stemMixLevels.beat = 1.0;
+      this.stemMixLevels.swappedInstrumental = 0.0;
+    }
     this.updateStemRouting();
     this.notify();
   }
@@ -159,14 +181,16 @@ export class MusicAudioEngine {
     this.swappedInstrumental = style;
     if (style !== 'none') {
       this.stemMode = 'swapped_instrumental';
+      this.stemMixLevels.beat = 0.0;
+      this.stemMixLevels.vocals = 1.0;
     }
     if (this.isPlaying) {
-      // Re-setup graph with new instrumental
       const cur = this.getCurrentTime();
       this.pause();
       this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
       this.play();
     }
+    this.updateStemRouting();
     this.notify();
   }
 
@@ -227,6 +251,7 @@ export class MusicAudioEngine {
       this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
       this.play();
     }
+    this.updateStemRouting();
     this.notify();
   }
 
@@ -237,56 +262,62 @@ export class MusicAudioEngine {
     const isWordsOnly = this.stemMode === 'words_only';
     const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
     const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
+    const isAltare = this.isAltareMode;
 
-    // 1. Vocal Mid-Band Gain (Lead singing words & spoken lyrics in center channel)
-    if (this.vocalMidGainNode) {
-      // If words muted: ZERO GAIN on center vocal frequencies (100% cancellation!)
+    if (isAltare) {
+      // In Altare Mode:
+      // Mute full original mix
+      if (this.fullGain) this.fullGain.gain.setTargetAtTime(0.0, now, 0.015);
+      // Original beat is muted (or custom mix)
+      if (this.beatGain) {
+        const bVol = this.altareConfig.muteOriginalBeat ? 0.0 : this.stemMixLevels.beat;
+        this.beatGain.gain.setTargetAtTime(bVol, now, 0.015);
+      }
+      // Original words are active (or muted)
+      if (this.vocalGain) {
+        const vVol = this.altareConfig.muteOriginalWords ? 0.0 : (this.stemMixLevels.vocals * 1.15);
+        this.vocalGain.gain.setTargetAtTime(vVol, now, 0.015);
+      }
+      if (this.altareGain) {
+        this.altareGain.gain.setTargetAtTime(1.05, now, 0.015);
+      }
+      if (this.vocalChopGain) {
+        this.vocalChopGain.gain.setTargetAtTime(1.15, now, 0.015);
+      }
+      return;
+    }
+
+    // Standard Mode:
+    if (this.stemMode === 'full') {
+      // 100% Bit-perfect original audio playback!
+      if (this.fullGain) this.fullGain.gain.setTargetAtTime(1.0, now, 0.015);
+      if (this.beatGain) this.beatGain.gain.setTargetAtTime(0.0, now, 0.015);
+      if (this.vocalGain) this.vocalGain.gain.setTargetAtTime(0.0, now, 0.015);
+      if (this.instrumentalGainNode) this.instrumentalGainNode.gain.setTargetAtTime(0.0, now, 0.015);
+      return;
+    }
+
+    // Stem Mode Active (Full original mix muted):
+    if (this.fullGain) this.fullGain.gain.setTargetAtTime(0.0, now, 0.015);
+
+    // 1. Vocal Gain: ZERO when words_muted!
+    if (this.vocalGain) {
       const vVol = isWordsMuted 
         ? 0.0 
-        : (isWordsOnly ? this.stemMixLevels.vocals * 1.35 : this.stemMixLevels.vocals);
-      this.vocalMidGainNode.gain.setTargetAtTime(vVol, now, 0.02);
+        : (isWordsOnly ? this.stemMixLevels.vocals * 1.25 : this.stemMixLevels.vocals);
+      this.vocalGain.gain.setTargetAtTime(vVol, now, 0.015);
     }
 
-    // 2. Sub-Bass & Kick Drum Preservation (< 160Hz)
-    if (this.bassPreserveGainNode) {
-      // In words_muted mode: keep 100% kick and bass punch intact!
-      // In words_only mode: mute kick and bass so acapella is pristine!
-      // In swapped mode: duck or blend original bass to let new style 808 hit!
-      const bVol = isWordsOnly 
-        ? 0.0 
-        : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : 1.0);
-      this.bassPreserveGainNode.gain.setTargetAtTime(bVol, now, 0.02);
+    // 2. Beat Gain: ZERO when words_only or swapped style!
+    if (this.beatGain) {
+      const bVol = (isWordsOnly || isSwapped) ? 0.0 : this.stemMixLevels.beat;
+      this.beatGain.gain.setTargetAtTime(bVol, now, 0.015);
     }
 
-    // 3. High Air & Cymbals Preservation (> 6500Hz)
-    if (this.airPreserveGainNode) {
-      const aVol = isWordsOnly 
-        ? 0.05 
-        : (isSwapped ? 0.3 * this.stemMixLevels.beat : 1.0);
-      this.airPreserveGainNode.gain.setTargetAtTime(aVol, now, 0.02);
-    }
-
-    // 4. Side Channel Gain (Stereo Guitars, Synths, Stereo Drums, Reverbs)
-    if (this.sideGainNode) {
-      // In words_muted mode: preserve and slightly boost stereo instruments (+15%)
-      // In words_only mode: mute side channel to eliminate backing instruments
-      const sVol = isWordsOnly 
-        ? 0.0 
-        : (isWordsMuted 
-            ? this.stemMixLevels.beat * 1.15 
-            : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : this.stemMixLevels.beat));
-      this.sideGainNode.gain.setTargetAtTime(sVol, now, 0.02);
-    }
-
-    // 5. Swapped Style Instrumental Gain (New AI Afrobeat / Trap / Amapiano beat)
+    // 3. Swapped Style Instrumental Gain
     if (this.instrumentalGainNode) {
       const instVol = isSwapped ? this.stemMixLevels.swappedInstrumental : 0.0;
-      this.instrumentalGainNode.gain.setTargetAtTime(instVol, now, 0.02);
-    }
-
-    // 6. Vocal Formant Peaking Boost adaptation
-    if (this.vocalPeakingNode) {
-      this.vocalPeakingNode.gain.setTargetAtTime(isWordsOnly ? 7.5 : (isWordsMuted ? -18 : 3.0), now, 0.02);
+      this.instrumentalGainNode.gain.setTargetAtTime(instVol, now, 0.015);
     }
   }
 
@@ -524,8 +555,13 @@ export class MusicAudioEngine {
     return buffer;
   }
 
-  // Generate synthetic high-quality demo track (Afrobeat Fusion / Amapiano / Synthwave / Lo-fi)
-  public async loadSyntheticTrack(presetName: 'midnight_drive' | 'cyber_trap' | 'lofi_rain' | 'viral_afro_fusion' | 'afrobeat_lagos' | 'amapiano_logdrum' | string): Promise<AudioBuffer> {
+  // Built-in original sounds removed - only user imported songs are played
+  public async loadSyntheticTrack(_presetName?: string): Promise<AudioBuffer> {
+    throw new Error('Original sounds removed. Please import your own audio song file to play.');
+  }
+
+  // Deprecated legacy generator
+  public async legacyUnusedSyntheticTrack(presetName: 'midnight_drive' | 'cyber_trap' | 'lofi_rain' | 'viral_afro_fusion' | 'afrobeat_lagos' | 'amapiano_logdrum' | string): Promise<AudioBuffer> {
     this.initContext();
     const ctx = this.ctx!;
     const sampleRate = ctx.sampleRate;
@@ -848,12 +884,101 @@ export class MusicAudioEngine {
     }
   }
 
+  // Generate high-precision separate stems: vocalBuffer (words only, beat muted) and instrumentalBuffer (beat only, words muted)
+  public separateStemsFromBuffer(buffer: AudioBuffer): { vocal: AudioBuffer; instrumental: AudioBuffer } {
+    this.initContext();
+    const ctx = this.ctx!;
+    const rate = buffer.sampleRate;
+    const len = buffer.length;
+    const numChan = buffer.numberOfChannels;
+
+    const instBuf = ctx.createBuffer(2, len, rate);
+    const vocBuf = ctx.createBuffer(2, len, rate);
+
+    const instL = instBuf.getChannelData(0);
+    const instR = instBuf.getChannelData(1);
+    const vocL = vocBuf.getChannelData(0);
+    const vocR = vocBuf.getChannelData(1);
+
+    const inL = buffer.getChannelData(0);
+    const inR = numChan > 1 ? buffer.getChannelData(1) : inL;
+
+    // Filters for high-accuracy vocal isolation:
+    // 1. Highpass at 180Hz (cuts kick drum, 808 sub, and bass guitar)
+    const hpCut = (180 / rate) * 2 * Math.PI;
+    let hpL = 0, hpInL = 0;
+
+    // 2. Lowpass at 6500Hz (cuts cymbals, air, hi-hat ticks)
+    const lpCut = (6500 / rate) * 2 * Math.PI;
+    let lpL = 0;
+
+    // Determine stereo vs mono content
+    let stereoEnergy = 0;
+    const checkSamples = Math.min(len, rate * 4);
+    for (let i = 0; i < checkSamples; i += 32) {
+      stereoEnergy += Math.abs(inL[i] - inR[i]);
+    }
+    const isStereo = stereoEnergy > 0.35;
+
+    for (let i = 0; i < len; i++) {
+      const l = inL[i];
+      const r = inR[i];
+
+      let vocalRaw = 0;
+      if (isStereo) {
+        // In stereo music, lead vocal words are mixed dead center with matching polarity:
+        // Left = L_side + Vocal, Right = R_side + Vocal
+        // Center estimator = min(|L|, |R|) with polarity matching when in-phase!
+        if (l * r > 0) {
+          vocalRaw = Math.sign(l) * Math.min(Math.abs(l), Math.abs(r));
+        } else {
+          vocalRaw = 0;
+        }
+      } else {
+        // Mono music: vocal bandpass on the entire mono channel
+        vocalRaw = (l + r) * 0.5;
+      }
+
+      // Filter vocalRaw: 180Hz highpass
+      const hp = vocalRaw - hpInL + (1 - hpCut) * hpL;
+      hpInL = vocalRaw;
+      hpL = hp;
+
+      // 6500Hz lowpass
+      const lp = lpL + lpCut * (hp - lpL);
+      lpL = lp;
+
+      const vocalExtracted = Math.max(-0.95, Math.min(0.95, lp * 1.15));
+
+      // 1. Vocal stem (words only, beat muted):
+      vocL[i] = vocalExtracted;
+      vocR[i] = vocalExtracted;
+
+      // 2. Instrumental stem (words muted, beat and instruments preserved):
+      // Subtract the extracted center vocal from each channel!
+      // In stereo: l - vocalExtracted leaves L_side and all wide instruments, plus sub-bass and cymbals!
+      const instLeft = isStereo ? (l - vocalExtracted * 0.98) : (l - vocalExtracted * 0.92);
+      const instRight = isStereo ? (r - vocalExtracted * 0.98) : (r - vocalExtracted * 0.92);
+
+      instL[i] = Math.max(-0.95, Math.min(0.95, instLeft));
+      instR[i] = Math.max(-0.95, Math.min(0.95, instRight));
+    }
+
+    return { vocal: vocBuf, instrumental: instBuf };
+  }
+
   // Load custom audio file imported by user
   public async loadAudioFile(file: File): Promise<AudioBuffer> {
     this.initContext();
     const arrayBuffer = await file.arrayBuffer();
     const decoded = await this.ctx!.decodeAudioData(arrayBuffer);
     this.currentBuffer = decoded;
+
+    // Separate stems into pure vocal and pure instrumental buffers immediately
+    const stems = this.separateStemsFromBuffer(decoded);
+    this.vocalBuffer = stems.vocal;
+    this.instrumentalBuffer = stems.instrumental;
+
     this.isAudioImportedByUser = true;
     this.pauseOffset = 0;
     this.notify();
@@ -864,6 +989,11 @@ export class MusicAudioEngine {
   public async loadAudioBuffer(buffer: AudioBuffer): Promise<AudioBuffer> {
     this.initContext();
     this.currentBuffer = buffer;
+
+    const stems = this.separateStemsFromBuffer(buffer);
+    this.vocalBuffer = stems.vocal;
+    this.instrumentalBuffer = stems.instrumental;
+
     this.isAudioImportedByUser = true;
     this.pauseOffset = 0;
     this.notify();
@@ -877,6 +1007,8 @@ export class MusicAudioEngine {
   public clearCurrentTrack() {
     this.pause();
     this.currentBuffer = null;
+    this.instrumentalBuffer = null;
+    this.vocalBuffer = null;
     this.isAudioImportedByUser = false;
     this.pauseOffset = 0;
     this.notify();
@@ -902,129 +1034,76 @@ export class MusicAudioEngine {
 
   // Build the complete DSP graph with Real-time Stem Separation and Swapped Instrumental Mixer
   private setupDSPGraph() {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.currentBuffer) return;
     const ctx = this.ctx;
 
     // Clean up previous nodes
-    if (this.sourceNode) {
-      try { this.sourceNode.stop(); } catch { /* ignore */ }
-      this.sourceNode.disconnect();
+    if (this.fullSourceNode) {
+      try { this.fullSourceNode.stop(); } catch { /* ignore */ }
+      this.fullSourceNode.disconnect();
+    }
+    if (this.beatSourceNode) {
+      try { this.beatSourceNode.stop(); } catch { /* ignore */ }
+      this.beatSourceNode.disconnect();
+    }
+    if (this.vocalSourceNode) {
+      try { this.vocalSourceNode.stop(); } catch { /* ignore */ }
+      this.vocalSourceNode.disconnect();
+    }
+    if (this.altareSourceNode) {
+      try { this.altareSourceNode.stop(); } catch { /* ignore */ }
+      this.altareSourceNode.disconnect();
+    }
+    if (this.vocalChopSourceNode) {
+      try { this.vocalChopSourceNode.stop(); } catch { /* ignore */ }
+      this.vocalChopSourceNode.disconnect();
     }
     if (this.instrumentalSourceNode) {
       try { this.instrumentalSourceNode.stop(); } catch { /* ignore */ }
       this.instrumentalSourceNode.disconnect();
     }
 
-    this.sourceNode = ctx.createBufferSource();
-    this.sourceNode.buffer = this.currentBuffer;
-    this.sourceNode.loop = true;
+    // Ensure pre-separated stem buffers exist
+    if (!this.instrumentalBuffer || !this.vocalBuffer) {
+      const stems = this.separateStemsFromBuffer(this.currentBuffer);
+      this.vocalBuffer = stems.vocal;
+      this.instrumentalBuffer = stems.instrumental;
+    }
 
     // 1. Playback rate (Speed & Pitch)
     const effectiveSpeed = this.isOriginalMode ? 1.0 : this.currentSettings.speed;
-    this.sourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
 
-    // 2. Mid/Side Splitter Matrix (Stereo Center Vocal Cancellation & Extraction)
-    this.splitterNode = ctx.createChannelSplitter(2);
-    this.sourceNode.connect(this.splitterNode);
+    // 2. Full original mix source node (Pristine original sound)
+    this.fullSourceNode = ctx.createBufferSource();
+    this.fullSourceNode.buffer = this.currentBuffer;
+    this.fullSourceNode.loop = true;
+    this.fullSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
 
-    // Mid = 0.5 * Left + 0.5 * Right
-    const midLeftGain = ctx.createGain(); midLeftGain.gain.value = 0.5;
-    const midRightGain = ctx.createGain(); midRightGain.gain.value = 0.5;
-    this.midSumNode = ctx.createGain();
-    this.splitterNode.connect(midLeftGain, 0);
-    this.splitterNode.connect(midRightGain, 1);
-    midLeftGain.connect(this.midSumNode);
-    midRightGain.connect(this.midSumNode);
+    // 3. Pure Instrumental Beat Source Node (words 100% muted)
+    this.beatSourceNode = ctx.createBufferSource();
+    this.beatSourceNode.buffer = this.instrumentalBuffer;
+    this.beatSourceNode.loop = true;
+    this.beatSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
 
-    // Side = 0.5 * Left - 0.5 * Right
-    const sideLeftGain = ctx.createGain(); sideLeftGain.gain.value = 0.5;
-    const sideRightGain = ctx.createGain(); sideRightGain.gain.value = -0.5;
-    this.sideSumNode = ctx.createGain();
-    this.splitterNode.connect(sideLeftGain, 0);
-    this.splitterNode.connect(sideRightGain, 1);
-    sideLeftGain.connect(this.sideSumNode);
-    sideRightGain.connect(this.sideSumNode);
+    // 4. Pure Vocal Words Source Node (beat 100% muted)
+    this.vocalSourceNode = ctx.createBufferSource();
+    this.vocalSourceNode.buffer = this.vocalBuffer;
+    this.vocalSourceNode.loop = true;
+    this.vocalSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
 
-    // 3. Mid Channel Crossover Filter Network:
-    // A. Sub-Bass & Kick Preservation (< 160Hz) - Kicks and basslines stay punchy!
-    this.bassLowpassNode = ctx.createBiquadFilter();
-    this.bassLowpassNode.type = 'lowpass';
-    this.bassLowpassNode.frequency.value = 160;
-    this.bassLowpassNode.Q.value = 0.707;
-    this.bassPreserveGainNode = ctx.createGain();
-    this.midSumNode.connect(this.bassLowpassNode);
-    this.bassLowpassNode.connect(this.bassPreserveGainNode);
+    // 5. Stem Gain Controllers for complete muting
+    this.fullGain = ctx.createGain();
+    this.beatGain = ctx.createGain();
+    this.vocalGain = ctx.createGain();
 
-    // B. Vocal Bandpass & Peaking (160Hz - 6500Hz) - Center Singing Words & Lyrics
-    this.vocalBandHighpassNode = ctx.createBiquadFilter();
-    this.vocalBandHighpassNode.type = 'highpass';
-    this.vocalBandHighpassNode.frequency.value = 160;
-    this.vocalBandHighpassNode.Q.value = 0.707;
+    this.fullSourceNode.connect(this.fullGain);
+    this.beatSourceNode.connect(this.beatGain);
+    this.vocalSourceNode.connect(this.vocalGain);
 
-    this.vocalBandLowpassNode = ctx.createBiquadFilter();
-    this.vocalBandLowpassNode.type = 'lowpass';
-    this.vocalBandLowpassNode.frequency.value = 6500;
-    this.vocalBandLowpassNode.Q.value = 0.707;
-
-    this.vocalPeakingNode = ctx.createBiquadFilter();
-    this.vocalPeakingNode.type = 'peaking';
-    this.vocalPeakingNode.frequency.value = 2800;
-    this.vocalPeakingNode.gain.value = 4.5;
-    this.vocalPeakingNode.Q.value = 1.0;
-
-    this.vocalMidGainNode = ctx.createGain();
-    this.midSumNode.connect(this.vocalBandHighpassNode);
-    this.vocalBandHighpassNode.connect(this.vocalBandLowpassNode);
-    this.vocalBandLowpassNode.connect(this.vocalPeakingNode);
-    this.vocalPeakingNode.connect(this.vocalMidGainNode);
-
-    // C. High-Frequency Air & Cymbals Preservation (> 6500Hz)
-    this.airHighpassNode = ctx.createBiquadFilter();
-    this.airHighpassNode.type = 'highpass';
-    this.airHighpassNode.frequency.value = 6500;
-    this.airHighpassNode.Q.value = 0.707;
-    this.airPreserveGainNode = ctx.createGain();
-    this.midSumNode.connect(this.airHighpassNode);
-    this.airHighpassNode.connect(this.airPreserveGainNode);
-
-    // D. Side Channel Gain (Stereo Guitars, Synths, Stereo Drums, Reverbs)
-    this.sideGainNode = ctx.createGain();
-    this.sideSumNode.connect(this.sideGainNode);
-
-    // 4. Initial stem values setup
-    const isWordsOnly = this.stemMode === 'words_only';
-    const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
-    const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
-
-    this.vocalMidGainNode.gain.value = isWordsMuted ? 0.0 : (isWordsOnly ? this.stemMixLevels.vocals * 1.35 : this.stemMixLevels.vocals);
-    this.bassPreserveGainNode.gain.value = isWordsOnly ? 0.0 : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : 1.0);
-    this.airPreserveGainNode.gain.value = isWordsOnly ? 0.05 : (isSwapped ? 0.3 * this.stemMixLevels.beat : 1.0);
-    this.sideGainNode.gain.value = isWordsOnly ? 0.0 : (isWordsMuted ? this.stemMixLevels.beat * 1.15 : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : this.stemMixLevels.beat));
-
-    // 5. Recombination back into Stereo Left and Right:
-    // MidComponents = bassPreserve + vocalMid + airPreserve
-    const recombineMidSum = ctx.createGain();
-    this.bassPreserveGainNode.connect(recombineMidSum);
-    this.vocalMidGainNode.connect(recombineMidSum);
-    this.airPreserveGainNode.connect(recombineMidSum);
-
-    // Left Out = MidComponents + Side
-    const outLeft = ctx.createGain();
-    recombineMidSum.connect(outLeft);
-    this.sideGainNode.connect(outLeft);
-
-    // Right Out = MidComponents - Side
-    const outRight = ctx.createGain();
-    recombineMidSum.connect(outRight);
-    const sideInverter = ctx.createGain();
-    sideInverter.gain.value = -1.0;
-    this.sideGainNode.connect(sideInverter);
-    sideInverter.connect(outRight);
-
-    // Merge Left and Right to stereo stream
-    this.recombineMergerNode = ctx.createChannelMerger(2);
-    outLeft.connect(this.recombineMergerNode, 0, 0);
-    outRight.connect(this.recombineMergerNode, 0, 1);
+    const stemMixer = ctx.createGain();
+    this.fullGain.connect(stemMixer);
+    this.beatGain.connect(stemMixer);
+    this.vocalGain.connect(stemMixer);
 
     // 6. User Bass Boost Filter (Low Shelf at 95Hz)
     this.bassFilter = ctx.createBiquadFilter();
@@ -1054,7 +1133,7 @@ export class MusicAudioEngine {
     this.is8DEnabled = !this.isOriginalMode && Boolean(this.currentSettings.pan8d);
     this.panSpeed = this.currentSettings.panSpeed || 0.1;
 
-    // 10. Compressor / Limiter
+    // 10. Compressor / Limiter targeting -9 LUFS
     this.compressor = ctx.createDynamicsCompressor();
     this.compressor.threshold.setValueAtTime(-18, ctx.currentTime);
     this.compressor.knee.setValueAtTime(30, ctx.currentTime);
@@ -1072,7 +1151,7 @@ export class MusicAudioEngine {
     this.masterGain.gain.value = 0.95;
 
     // --- WIRING STEREO CHAIN ---
-    this.recombineMergerNode.connect(this.bassFilter);
+    stemMixer.connect(this.bassFilter);
     this.bassFilter.connect(this.lofiFilter);
 
     // Dry & Wet paths
@@ -1085,9 +1164,50 @@ export class MusicAudioEngine {
 
     this.panner8D.connect(this.compressor);
 
-    // --- SECONDARY SOURCE: SWAPPED INSTRUMENTAL (AFROBEAT / AMAPIANO / GQOM) ---
+    // --- ALTARE FUTURE BASS / TRAP REMIX SYNTHESIS ENGINE ---
+    if (this.isAltareMode) {
+      if (!this.altareArrangementBuffer) {
+        this.altareArrangementBuffer = AltareEngine.generateArrangementBuffer(
+          ctx,
+          this.altareConfig,
+          this.currentBuffer.duration
+        );
+      }
+      this.altareSourceNode = ctx.createBufferSource();
+      this.altareSourceNode.buffer = this.altareArrangementBuffer;
+      this.altareSourceNode.loop = true;
+
+      this.altareGain = ctx.createGain();
+      this.altareGain.gain.value = 1.05;
+
+      this.altareSourceNode.connect(this.altareGain);
+      this.altareGain.connect(this.compressor);
+
+      // Vocal Chops Lead
+      if (this.vocalBuffer && this.altareConfig.vocalChopDensity !== 'sparse') {
+        if (!this.vocalChopBuffer) {
+          this.vocalChopBuffer = AltareEngine.generateVocalChopLead(
+            ctx,
+            this.vocalBuffer,
+            this.altareConfig,
+            this.currentBuffer.duration
+          );
+        }
+        this.vocalChopSourceNode = ctx.createBufferSource();
+        this.vocalChopSourceNode.buffer = this.vocalChopBuffer;
+        this.vocalChopSourceNode.loop = true;
+
+        this.vocalChopGain = ctx.createGain();
+        this.vocalChopGain.gain.value = 1.15;
+
+        this.vocalChopSourceNode.connect(this.vocalChopGain);
+        this.vocalChopGain.connect(this.compressor);
+      }
+    }
+
+    // --- SECONDARY SOURCE: SWAPPED INSTRUMENTAL ---
     const swapStyle = this.currentSettings.instrumentalSwap || this.swappedInstrumental;
-    if (swapStyle && swapStyle !== 'none' && this.stemMode === 'swapped_instrumental') {
+    if (swapStyle && swapStyle !== 'none' && this.stemMode === 'swapped_instrumental' && !this.isAltareMode) {
       const instBuffer = this.getOrCreateInstrumentalBuffer(swapStyle);
       this.instrumentalSourceNode = ctx.createBufferSource();
       this.instrumentalSourceNode.buffer = instBuffer;
@@ -1114,6 +1234,7 @@ export class MusicAudioEngine {
       console.warn('MediaStreamDestination notice:', err);
     }
 
+    this.updateStemRouting();
     this.start8DAnimation();
   }
 
@@ -1155,16 +1276,30 @@ export class MusicAudioEngine {
 
     this.setupDSPGraph();
     const offset = this.pauseOffset % this.currentBuffer.duration;
-    this.sourceNode?.start(0, offset);
 
+    if (this.fullSourceNode) {
+      try { this.fullSourceNode.start(0, offset); } catch (e) { /* ignore */ }
+    }
+    if (this.beatSourceNode) {
+      try { this.beatSourceNode.start(0, offset); } catch (e) { /* ignore */ }
+    }
+    if (this.vocalSourceNode) {
+      try { this.vocalSourceNode.start(0, offset); } catch (e) { /* ignore */ }
+    }
+    if (this.altareSourceNode) {
+      const altareBuf = this.altareSourceNode.buffer;
+      const altareOffset = altareBuf ? (this.pauseOffset % altareBuf.duration) : 0;
+      try { this.altareSourceNode.start(0, altareOffset); } catch (e) { /* ignore */ }
+    }
+    if (this.vocalChopSourceNode) {
+      const chopBuf = this.vocalChopSourceNode.buffer;
+      const chopOffset = chopBuf ? (this.pauseOffset % chopBuf.duration) : 0;
+      try { this.vocalChopSourceNode.start(0, chopOffset); } catch (e) { /* ignore */ }
+    }
     if (this.instrumentalSourceNode) {
       const instBuffer = this.instrumentalSourceNode.buffer;
       const instOffset = instBuffer ? (this.pauseOffset % instBuffer.duration) : 0;
-      try {
-        this.instrumentalSourceNode.start(0, instOffset);
-      } catch (err) {
-        console.warn('Instrumental start err', err);
-      }
+      try { this.instrumentalSourceNode.start(0, instOffset); } catch (e) { /* ignore */ }
     }
 
     this.startTime = this.ctx!.currentTime - (offset / (this.isOriginalMode ? 1.0 : this.currentSettings.speed));
@@ -1182,12 +1317,12 @@ export class MusicAudioEngine {
   public pause() {
     if (!this.isPlaying) return;
     this.pauseOffset = this.getCurrentTime() * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
-    try {
-      this.sourceNode?.stop();
-    } catch { /* ignore */ }
-    try {
-      this.instrumentalSourceNode?.stop();
-    } catch { /* ignore */ }
+    try { this.fullSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.beatSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.vocalSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.altareSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.vocalChopSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.instrumentalSourceNode?.stop(); } catch { /* ignore */ }
 
     this.isPlaying = false;
     if (this.timeUpdateTimer) clearInterval(this.timeUpdateTimer);
@@ -1223,6 +1358,152 @@ export class MusicAudioEngine {
     return Math.max(0, elapsed);
   }
 
+  // --- PROJECT ALTARE-BUILDER CONTROLS ---
+  public enableAltareRemix(config: Partial<AltareRemixConfig> = {}) {
+    this.isAltareMode = true;
+    this.altareConfig = { ...this.altareConfig, ...config };
+    this.altareArrangementBuffer = null; // force regen
+    this.vocalChopBuffer = null;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur;
+      this.play();
+    }
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  public disableAltareRemix() {
+    this.isAltareMode = false;
+    this.altareArrangementBuffer = null;
+    this.vocalChopBuffer = null;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur;
+      this.play();
+    }
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  public getIsAltareMode(): boolean {
+    return this.isAltareMode;
+  }
+
+  public getAltareConfig(): AltareRemixConfig {
+    return { ...this.altareConfig };
+  }
+
+  public setAltareConfig(config: Partial<AltareRemixConfig>) {
+    this.altareConfig = { ...this.altareConfig, ...config };
+    this.altareArrangementBuffer = null;
+    this.vocalChopBuffer = null;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur;
+      this.play();
+    }
+    this.updateStemRouting();
+    this.notify();
+  }
+
+  // Export Mastered Altare Remix WAV (-9 LUFS Brickwall)
+  public async renderAltareRemixWAV(): Promise<Blob> {
+    if (!this.currentBuffer) throw new Error('No audio buffer loaded');
+
+    const duration = Math.min(this.currentBuffer.duration, 75.0);
+    const sampleRate = 44100;
+    const length = Math.ceil(duration * sampleRate);
+    const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
+
+    // 1. Altare Arrangement (Supersaws, Reese Bass, 808s)
+    const arrBuf = AltareEngine.generateArrangementBuffer(offlineCtx, this.altareConfig, duration);
+    const arrSrc = offlineCtx.createBufferSource();
+    arrSrc.buffer = arrBuf;
+    const arrGain = offlineCtx.createGain();
+    arrGain.gain.value = 1.05;
+    arrSrc.connect(arrGain);
+
+    // 2. Isolated Vocal Stem from user track
+    if (!this.vocalBuffer) {
+      const stems = this.separateStemsFromBuffer(this.currentBuffer);
+      this.vocalBuffer = stems.vocal;
+    }
+    const vocSrc = offlineCtx.createBufferSource();
+    vocSrc.buffer = this.vocalBuffer;
+    const vocGain = offlineCtx.createGain();
+    vocGain.gain.value = this.altareConfig.muteOriginalWords ? 0.0 : 1.1;
+    vocSrc.connect(vocGain);
+
+    // 3. Melodic Vocal Chops Lead
+    const chopBuf = AltareEngine.generateVocalChopLead(offlineCtx, this.vocalBuffer, this.altareConfig, duration);
+    const chopSrc = offlineCtx.createBufferSource();
+    chopSrc.buffer = chopBuf;
+    const chopGain = offlineCtx.createGain();
+    chopGain.gain.value = 1.15;
+    chopSrc.connect(chopGain);
+
+    // 4. Compressor / Limiter targeting -9 LUFS
+    const comp = offlineCtx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-14, 0);
+    comp.ratio.setValueAtTime(4.5, 0);
+    comp.knee.setValueAtTime(25, 0);
+
+    arrGain.connect(comp);
+    vocGain.connect(comp);
+    chopGain.connect(comp);
+
+    comp.connect(offlineCtx.destination);
+
+    arrSrc.start(0);
+    vocSrc.start(0);
+    chopSrc.start(0);
+
+    const rendered = await offlineCtx.startRendering();
+    return this.bufferToWave(rendered);
+  }
+
+  // Export Separated Stems for Altare Remix (Vocal Chops, Instrumental Synth Drop, Master)
+  public async renderAltareStems(): Promise<{ vocalChops: Blob; synthDrop: Blob; fullRemix: Blob }> {
+    if (!this.currentBuffer) throw new Error('No audio buffer loaded');
+    const duration = Math.min(this.currentBuffer.duration, 75.0);
+    const sampleRate = 44100;
+    const length = Math.ceil(duration * sampleRate);
+
+    // Render Vocal Chops
+    const ctxChop = new OfflineAudioContext(2, length, sampleRate);
+    if (!this.vocalBuffer) {
+      const stems = this.separateStemsFromBuffer(this.currentBuffer);
+      this.vocalBuffer = stems.vocal;
+    }
+    const chopBuf = AltareEngine.generateVocalChopLead(ctxChop, this.vocalBuffer, this.altareConfig, duration);
+    const srcChop = ctxChop.createBufferSource();
+    srcChop.buffer = chopBuf;
+    srcChop.connect(ctxChop.destination);
+    srcChop.start(0);
+    const rendChop = await ctxChop.startRendering();
+
+    // Render Synth Drop Instrumental
+    const ctxDrop = new OfflineAudioContext(2, length, sampleRate);
+    const dropBuf = AltareEngine.generateArrangementBuffer(ctxDrop, this.altareConfig, duration);
+    const srcDrop = ctxDrop.createBufferSource();
+    srcDrop.buffer = dropBuf;
+    srcDrop.connect(ctxDrop.destination);
+    srcDrop.start(0);
+    const rendDrop = await ctxDrop.startRendering();
+
+    const fullBlob = await this.renderAltareRemixWAV();
+
+    return {
+      vocalChops: this.bufferToWave(rendChop),
+      synthDrop: this.bufferToWave(rendDrop),
+      fullRemix: fullBlob,
+    };
+  }
+
   public setTransformation(preset: TransformationPreset) {
     this.currentSettings = { ...preset };
     if (preset.stemMode) {
@@ -1232,20 +1513,28 @@ export class MusicAudioEngine {
       this.swappedInstrumental = preset.instrumentalSwap;
     }
 
-    if (this.isPlaying) {
-      if (this.sourceNode && !this.isOriginalMode) {
-        this.sourceNode.playbackRate.setValueAtTime(this.currentSettings.speed, this.ctx!.currentTime);
+    if (this.isPlaying && this.ctx) {
+      const speed = Math.max(0.3, Math.min(2.0, this.isOriginalMode ? 1.0 : this.currentSettings.speed));
+      const now = this.ctx.currentTime;
+      if (this.fullSourceNode) {
+        this.fullSourceNode.playbackRate.setValueAtTime(speed, now);
+      }
+      if (this.beatSourceNode) {
+        this.beatSourceNode.playbackRate.setValueAtTime(speed, now);
+      }
+      if (this.vocalSourceNode) {
+        this.vocalSourceNode.playbackRate.setValueAtTime(speed, now);
       }
       if (this.bassFilter && !this.isOriginalMode) {
-        this.bassFilter.gain.setValueAtTime(this.currentSettings.bassBoost, this.ctx!.currentTime);
+        this.bassFilter.gain.setValueAtTime(this.currentSettings.bassBoost, now);
       }
       if (this.lofiFilter && !this.isOriginalMode) {
-        this.lofiFilter.frequency.setValueAtTime(this.currentSettings.lofiCutoff || 20000, this.ctx!.currentTime);
+        this.lofiFilter.frequency.setValueAtTime(this.currentSettings.lofiCutoff || 20000, now);
       }
       if (this.wetGain && this.dryGain && !this.isOriginalMode) {
         const wetVal = Math.max(0, Math.min(0.9, this.currentSettings.reverbWet));
-        this.wetGain.gain.setValueAtTime(wetVal, this.ctx!.currentTime);
-        this.dryGain.gain.setValueAtTime(Math.max(0.1, 1.0 - wetVal * 0.6), this.ctx!.currentTime);
+        this.wetGain.gain.setValueAtTime(wetVal, now);
+        this.dryGain.gain.setValueAtTime(Math.max(0.1, 1.0 - wetVal * 0.6), now);
       }
       this.is8DEnabled = !this.isOriginalMode && Boolean(this.currentSettings.pan8d);
       this.panSpeed = this.currentSettings.panSpeed || 0.1;
