@@ -10,10 +10,11 @@ import {
   Plus,
   Mic2,
   ArrowRightLeft,
-  Zap
+  Zap,
+  Film
 } from 'lucide-react';
 
-export type NavTab = 'dashboard' | 'studio' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
+export type NavTab = 'vizmotion' | 'dashboard' | 'studio' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
 
 interface NavigationDockProps {
   activeTab: NavTab;
@@ -33,10 +34,11 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
   onOpenBeatMaker,
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'vizmotion', label: 'VIZMOTION AI Video Editor', icon: Film },
     { id: 'dashboard', label: 'Console', icon: Home },
-    { id: 'studio', label: 'Studio Engine', icon: Sliders },
+    { id: 'studio', label: 'Studio Engine & Remix', icon: Sliders },
     { id: 'vibe', label: 'Make It A Vibe', icon: Sparkles },
-    { id: 'visuals', label: 'HD Video & Thumbnail Studio', icon: Video },
+    { id: 'visuals', label: 'Audio Visualizer Studio', icon: Video },
     { id: 'trends', label: 'Trend Discovery', icon: TrendingUp },
     { id: 'rights', label: 'Rights Center', icon: ShieldCheck },
     { id: 'publish', label: 'Publisher', icon: Send },

@@ -248,17 +248,13 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
     }
   };
 
-  const handleQuickPapaoutaiRemix = async () => {
-    const papa = SAMPLE_TRACKS.find(t => t.id === 'papaoutai-afrobeat-remix') || SAMPLE_TRACKS[0];
-    onUpdateTrack(papa);
-    await globalAudioEngine.loadSyntheticTrack('papaoutai_afro_remix');
-    const papaPreset = PRESET_STYLES.find(p => p.id === 'papaoutai_afro_remix') || PRESET_STYLES[0];
-    onUpdatePreset(papaPreset);
-    globalAudioEngine.setTransformation(papaPreset);
-    globalAudioEngine.setStemMode('swapped_instrumental');
-    globalAudioEngine.setSwappedInstrumental('afrobeat_lagos');
-    globalAudioEngine.setStemLevels({ vocals: 1.1, beat: 0.0, swappedInstrumental: 1.05 });
-    globalAudioEngine.play();
+  const handleQuickMuteWords = () => {
+    const isCurrentlyWordsMuted = globalAudioEngine.getStemMode() === 'words_muted';
+    if (isCurrentlyWordsMuted) {
+      globalAudioEngine.restoreFullMix();
+    } else {
+      globalAudioEngine.muteOriginalWords();
+    }
   };
 
   return (
@@ -490,20 +486,24 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* 1-Click Papaoutai Afro Remix */}
+            {/* 1-Click Mute Original Words (Karaoke Mode) */}
             <button
-              onClick={handleQuickPapaoutaiRemix}
-              className="p-3.5 rounded-xl bg-gradient-to-br from-[#f59e0b]/25 to-[#ea580c]/25 hover:from-[#f59e0b]/35 hover:to-[#ea580c]/35 border border-[#f59e0b]/60 text-left transition-all group"
+              onClick={handleQuickMuteWords}
+              className={`p-3.5 rounded-xl border text-left transition-all group ${
+                globalAudioEngine.getStemMode() === 'words_muted'
+                  ? 'bg-rose-500/25 border-rose-500 text-white shadow-lg shadow-rose-500/20'
+                  : 'bg-gradient-to-br from-rose-950/40 to-[#220c0e] hover:from-rose-900/40 hover:to-[#341315] border-rose-900/60'
+              }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-black text-[#f59e0b] uppercase">VIRAL PRESET</span>
-                <Flame className="w-3.5 h-3.5 text-[#f59e0b]" />
+                <span className="text-[10px] font-black text-rose-400 uppercase">KARAOKE MODE</span>
+                <Flame className="w-3.5 h-3.5 text-rose-400" />
               </div>
-              <div className="text-xs font-black text-white group-hover:text-[#fcd34d]">
-                Papaoutai Afrobeat Remix
+              <div className="text-xs font-black text-white group-hover:text-rose-200">
+                Mute Original Words
               </div>
-              <div className="text-[10px] text-[#e6bca0] mt-0.5">
-                Isolate words + 114 BPM Lagos Afro beat
+              <div className="text-[10px] text-rose-200/80 mt-0.5">
+                {globalAudioEngine.getStemMode() === 'words_muted' ? 'Active: Words Silenced!' : 'Karaoke: Keep beat, mute lyrics'}
               </div>
             </button>
 

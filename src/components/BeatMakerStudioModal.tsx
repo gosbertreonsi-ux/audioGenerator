@@ -94,6 +94,30 @@ const PRESET_PATTERNS: Record<string, { bpm: number; steps: Record<DrumTrack, bo
       kalimba: [true, false, true, false, false, true, false, true, false, true, false, false, true, false, true, false],
       horn: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
     }
+  },
+  'Southern Trap 808 (140 BPM)': {
+    bpm: 140,
+    steps: {
+      kick: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
+      snare: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+      hihat: [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
+      shaker: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
+      logdrum: [true, false, false, false, false, false, true, false, false, false, false, false, true, false, false, false],
+      kalimba: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+      horn: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false],
+    }
+  },
+  'UK Drill Dark (142 BPM)': {
+    bpm: 142,
+    steps: {
+      kick: [true, false, false, false, false, false, false, true, false, false, true, false, false, false, false, false],
+      snare: [false, false, false, false, false, false, false, false, true, false, false, false, false, false, true, false],
+      hihat: [true, false, true, true, false, true, true, false, true, true, false, true, true, false, true, true],
+      shaker: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+      logdrum: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false],
+      kalimba: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+      horn: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false],
+    }
   }
 };
 

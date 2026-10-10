@@ -70,6 +70,11 @@ export const InstrumentalSwapperModal: React.FC<InstrumentalSwapperModalProps> =
       setBeatLevel(0);
       setSwapLevel(0);
       globalAudioEngine.setStemLevels({ vocals: 1.1, beat: 0.0, swappedInstrumental: 0.0 });
+    } else if (mode === 'words_muted') {
+      setVocalLevel(0);
+      setBeatLevel(100);
+      setSwapLevel(0);
+      globalAudioEngine.muteOriginalWords();
     } else if (mode === 'beat_only') {
       setVocalLevel(0);
       setBeatLevel(100);
@@ -100,20 +105,16 @@ export const InstrumentalSwapperModal: React.FC<InstrumentalSwapperModalProps> =
     }
   };
 
-  // Papaoutai Viral Showcase Button
-  const handleLoadPapaoutaiAfroRemix = async () => {
-    const papaoutaiTrack = SAMPLE_TRACKS.find(t => t.id === 'papaoutai-afrobeat-remix') || SAMPLE_TRACKS[0];
-    onSelectTrack(papaoutaiTrack);
-    await globalAudioEngine.loadSyntheticTrack('papaoutai_afro_remix');
-    
-    setSelectedStyle('afrobeat_lagos');
+  // Quick Style Shifter & Muter (Afrobeat, Southern Trap, Amapiano)
+  const handleQuickStyleShift = async (styleId: string) => {
+    setSelectedStyle(styleId);
     setStemMode('swapped_instrumental');
-    setVocalLevel(110);
+    setVocalLevel(100);
     setBeatLevel(0); // mute original beat!
-    setSwapLevel(105); // drop Lagos Afrobeat beat!
+    setSwapLevel(110); // apply high-energy style!
     
-    globalAudioEngine.setStemLevels({ vocals: 1.1, beat: 0, swappedInstrumental: 1.05 });
-    globalAudioEngine.setSwappedInstrumental('afrobeat_lagos');
+    globalAudioEngine.setStemLevels({ vocals: 1.0, beat: 0, swappedInstrumental: 1.1 });
+    globalAudioEngine.setSwappedInstrumental(styleId);
     globalAudioEngine.play();
   };
 
@@ -207,35 +208,62 @@ export const InstrumentalSwapperModal: React.FC<InstrumentalSwapperModalProps> =
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-6">
 
-          {/* 1. VIRAL PAPAOUTAI SHOWCASE BANNER */}
-          <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-[#2a1005] via-[#3a1510] to-[#1a080a] border border-[#f59e0b]/40 shadow-xl overflow-hidden">
+          {/* 1. PRO MUSIC STYLE SHIFTER & STEM SUITE */}
+          <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-[#200d07] via-[#2d1110] to-[#140608] border border-[#f59e0b]/40 shadow-xl overflow-hidden">
             <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div className="space-y-1.5 max-w-2xl">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2 py-0.5 rounded bg-[#f59e0b] text-black text-[10px] font-black uppercase tracking-wider">
-                    VIRAL TIKTOK / REELS TREND
+                    PRO MUSIC STYLE SHIFTER
                   </span>
-                  <span className="text-xs font-mono text-[#fcd34d]">Stromae "Papaoutai" Afrobeat Re-imagination</span>
+                  <span className="text-xs font-mono text-[#fcd34d]">Change Instrumental • Mute Words or Beat • All Models</span>
                 </div>
                 <h3 className="text-lg md:text-xl font-black text-white">
-                  Papaoutai Changed to High-Energy Afrobeat Song
+                  Instantly Transform Songs & Mute Words or Beats
                 </h3>
                 <p className="text-xs text-[#e6bca0] leading-relaxed">
-                  Hear the viral phenomenon: Stromae's iconic French acapella words ("Où t'es, papaoutai?") isolated with the electro-pop beat muted, replaced by infectious 114 BPM Lagos Afrobeat syncopated drums, brass horns, and kalimba!
+                  Extract original human singing words with beat muted, or mute original lyrics for a clean instrumental, then swap into authentic 112 BPM Afrobeat, 140 BPM Southern Trap 808s, or Amapiano log drums!
                 </p>
               </div>
 
-              <button
-                onClick={handleLoadPapaoutaiAfroRemix}
-                className="shrink-0 px-5 py-3 rounded-xl bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#fbbf24] hover:to-[#f97316] text-black font-black text-xs uppercase tracking-wider shadow-lg shadow-[#f59e0b]/30 flex items-center gap-2 hover:scale-105 active:scale-95 transition-all"
-              >
-                <Zap className="w-4 h-4 fill-black" />
-                LOAD PAPAOUTAI AFRO REMIX NOW
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => handleQuickStyleShift('afrobeat_lagos')}
+                  className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#f59e0b] to-[#ea580c] hover:from-[#fbbf24] hover:to-[#f97316] text-black font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-black" />
+                  Afrobeat Lagos
+                </button>
+                <button
+                  onClick={() => handleQuickStyleShift('southern_trap')}
+                  className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#8b5cf6] to-[#ec4899] text-white font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all"
+                >
+                  <Flame className="w-3.5 h-3.5 fill-white" />
+                  Southern Trap 808
+                </button>
+                <button
+                  onClick={() => handleQuickStyleShift('amapiano_logdrum')}
+                  className="px-3.5 py-2.5 rounded-xl bg-[#220d0f] hover:bg-[#341315] border border-[#f59e0b]/50 text-[#f59e0b] font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                >
+                  Amapiano Bacardi
+                </button>
+                {onOpenVideoStudio && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenVideoStudio();
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    Open in VIZMOTION Video
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* 2. STEM MODE SELECTOR (WORDS ONLY / BEAT ONLY / SWAPPED / BALANCED) */}
+          {/* 2. STEM MODE SELECTOR (WORDS ONLY / WORDS MUTED / SWAPPED / BEAT ONLY / FULL) */}
           <div className="rounded-2xl p-4 md:p-5 bg-[#1a0a0c] border border-[#361315] space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
@@ -247,69 +275,85 @@ export const InstrumentalSwapperModal: React.FC<InstrumentalSwapperModalProps> =
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <button
+                onClick={() => handleApplyStemMode('words_muted')}
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                  stemMode === 'words_muted'
+                    ? 'bg-rose-500/20 border-rose-500 text-white shadow-lg shadow-rose-500/20 scale-[1.02]'
+                    : 'bg-[#220d0f] border-[#361315] text-[#b0878a] hover:text-white hover:bg-[#2b1013]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <Mic className="w-4 h-4 text-rose-400 line-through" />
+                  {stemMode === 'words_muted' && <Check className="w-3.5 h-3.5 text-rose-400" />}
+                </div>
+                <div className="font-bold text-xs text-white">Mute Words</div>
+                <div className="text-[10px] text-rose-300/80 mt-0.5">Karaoke Instrumental</div>
+              </button>
+
               <button
                 onClick={() => handleApplyStemMode('words_only')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   stemMode === 'words_only'
                     ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-white shadow-lg shadow-[#06b6d4]/20 scale-[1.02]'
                     : 'bg-[#220d0f] border-[#361315] text-[#b0878a] hover:text-white hover:bg-[#2b1013]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <Mic className="w-4 h-4 text-[#06b6d4]" />
                   {stemMode === 'words_only' && <Check className="w-3.5 h-3.5 text-[#06b6d4]" />}
                 </div>
-                <div className="font-bold text-xs text-white">Words Only (Mute Beat)</div>
-                <div className="text-[10px] text-[#06b6d4]/80 mt-1">Pure isolated vocal acapella</div>
+                <div className="font-bold text-xs text-white">Mute Beat</div>
+                <div className="text-[10px] text-[#06b6d4]/80 mt-0.5">Pure Acapella Words</div>
               </button>
 
               <button
                 onClick={() => handleApplyStemMode('swapped_instrumental')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   stemMode === 'swapped_instrumental'
                     ? 'bg-[#f59e0b]/20 border-[#f59e0b] text-white shadow-lg shadow-[#f59e0b]/20 scale-[1.02]'
                     : 'bg-[#220d0f] border-[#361315] text-[#b0878a] hover:text-white hover:bg-[#2b1013]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <ArrowRightLeft className="w-4 h-4 text-[#f59e0b]" />
                   {stemMode === 'swapped_instrumental' && <Check className="w-3.5 h-3.5 text-[#f59e0b]" />}
                 </div>
-                <div className="font-bold text-xs text-white">Swapped Instrumental</div>
-                <div className="text-[10px] text-[#f59e0b]/80 mt-1">Words + African Backing Groove</div>
+                <div className="font-bold text-xs text-white">Swapped Style</div>
+                <div className="text-[10px] text-[#f59e0b]/80 mt-0.5">African / Trap Backing</div>
               </button>
 
               <button
                 onClick={() => handleApplyStemMode('beat_only')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   stemMode === 'beat_only'
                     ? 'bg-[#a855f7]/20 border-[#a855f7] text-white shadow-lg shadow-[#a855f7]/20 scale-[1.02]'
                     : 'bg-[#220d0f] border-[#361315] text-[#b0878a] hover:text-white hover:bg-[#2b1013]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <Music className="w-4 h-4 text-[#a855f7]" />
                   {stemMode === 'beat_only' && <Check className="w-3.5 h-3.5 text-[#a855f7]" />}
                 </div>
-                <div className="font-bold text-xs text-white">Original Beat Only</div>
-                <div className="text-[10px] text-[#a855f7]/80 mt-1">Mute vocals, play beat</div>
+                <div className="font-bold text-xs text-white">Original Beat</div>
+                <div className="text-[10px] text-[#a855f7]/80 mt-0.5">Play Beat, Mute Vocals</div>
               </button>
 
               <button
                 onClick={() => handleApplyStemMode('full')}
-                className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                   stemMode === 'full'
                     ? 'bg-[#ea3838]/20 border-[#ea3838] text-white shadow-lg shadow-[#ea3838]/20 scale-[1.02]'
                     : 'bg-[#220d0f] border-[#361315] text-[#b0878a] hover:text-white hover:bg-[#2b1013]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <Sliders className="w-4 h-4 text-[#ea3838]" />
                   {stemMode === 'full' && <Check className="w-3.5 h-3.5 text-[#ea3838]" />}
                 </div>
-                <div className="font-bold text-xs text-white">Full Balanced Mix</div>
-                <div className="text-[10px] text-[#ea3838]/80 mt-1">Default master playback</div>
+                <div className="font-bold text-xs text-white">Full Mix</div>
+                <div className="text-[10px] text-[#ea3838]/80 mt-0.5">Original Master Audio</div>
               </button>
             </div>
           </div>

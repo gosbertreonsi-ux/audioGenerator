@@ -10,7 +10,8 @@ import {
   Activity, 
   X,
   Volume2,
-  Video
+  Video,
+  Film
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset } from '../../types';
 import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
@@ -159,11 +160,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
 
               <button
-                onClick={() => onNavigateTab('visuals')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#260e10] hover:bg-[#381417] text-[#ff8085] hover:text-white border border-[#4a1c20] text-xs font-bold transition-all shadow-md active:scale-95"
+                onClick={() => onNavigateTab('vizmotion')}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff4d4d] hover:brightness-110 text-white border border-[#4a1c20] text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-[#ea3838]/20 active:scale-95"
               >
-                <Video className="w-3.5 h-3.5" />
-                HD Video Studio
+                <Film className="w-3.5 h-3.5" />
+                VIZMOTION Video Editor
               </button>
             </div>
           </div>

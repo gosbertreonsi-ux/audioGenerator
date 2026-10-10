@@ -30,7 +30,7 @@ export interface TransformationPreset {
   panSpeed: number; // 0.04 - 0.4 Hz
   lofiCutoff: number; // 1000 - 20000 Hz
   color: string;
-  stemMode?: 'full' | 'words_only' | 'beat_only' | 'swapped_instrumental';
+  stemMode?: StemMode;
   instrumentalSwap?: string;
 }
 

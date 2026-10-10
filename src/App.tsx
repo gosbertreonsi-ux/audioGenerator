@@ -14,6 +14,7 @@ import { VisualizerStudioView } from './components/views/VisualizerStudioView';
 import { TrendDiscoveryView } from './components/views/TrendDiscoveryView';
 import { RightsCenterView } from './components/views/RightsCenterView';
 import { PublishingView } from './components/views/PublishingView';
+import { VizmotionAIEditor } from './components/views/VizmotionAIEditor';
 import { QuickUploadModal } from './components/QuickUploadModal';
 import { VocalModelsModal } from './components/VocalModelsModal';
 import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
@@ -24,7 +25,7 @@ import { AudioTrack, TransformationPreset, VocalModel } from './types';
 import { globalAudioEngine } from './lib/audioEngine';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTab>('vizmotion');
   const [currentTrack, setCurrentTrack] = useState<AudioTrack>(SAMPLE_TRACKS[0]);
   const [activePreset, setActivePreset] = useState<TransformationPreset>(PRESET_STYLES[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +96,17 @@ export default function App() {
 
           {/* Active View Switcher */}
           <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {activeTab === 'vizmotion' && (
+              <VizmotionAIEditor
+                currentTrack={currentTrack}
+                activePreset={activePreset}
+                onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
+                onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
+                onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+                onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
+              />
+            )}
+
             {activeTab === 'dashboard' && (
               <DashboardView
                 currentTrack={currentTrack}
@@ -114,7 +126,7 @@ export default function App() {
                 onUpdatePreset={setActivePreset}
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
                 onOpenVocalModels={() => setIsVocalModelsOpen(true)}
-                onOpenVideoStudio={() => setActiveTab('visuals')}
+                onOpenVideoStudio={() => setActiveTab('vizmotion')}
                 onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
                 onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
                 activeVocalModel={activeVocalModel}
@@ -217,7 +229,7 @@ export default function App() {
         }}
         onOpenVideoStudio={() => {
           setIsInstrumentalSwapperOpen(false);
-          setActiveTab('visuals');
+          setActiveTab('vizmotion');
         }}
       />
 
