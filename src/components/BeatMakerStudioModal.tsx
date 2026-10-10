@@ -489,7 +489,7 @@ export const BeatMakerStudioModal: React.FC<BeatMakerStudioModalProps> = ({
                 { chord: 'Bm7', desc: 'Bacardi Vibe', color: '#ec4899' },
                 { chord: 'Em9', desc: 'Deep Piano', color: '#06b6d4' },
                 { chord: 'A13', desc: 'Afro Jazz Horn', color: '#f59e0b' },
-                { chord: 'Gmaj7', desc: 'Lagos Sunset', color: '#10b981' },
+                { chord: 'Gmaj7', desc: 'Lagos Soul Groove', color: '#10b981' },
                 { chord: 'Dmaj7', desc: 'Highlife Gold', color: '#ea3838' },
               ].map((item) => (
                 <button

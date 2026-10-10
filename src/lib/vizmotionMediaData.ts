@@ -60,63 +60,6 @@ export const STOCK_MEDIA_LIBRARY: StockMediaItem[] = [
     description: 'Moody analog mixing console, neon VU meters and smoke swirls'
   },
 
-  // Audio Stems & Music
-  {
-    id: 'aud-afro-master',
-    title: 'Lagos Afrobeat Fusion (Master)',
-    type: 'audio',
-    category: 'Music',
-    duration: 30,
-    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=60',
-    color: '#f59e0b',
-    description: '112 BPM Authentic West African groove with brass and kalimba',
-    meta: { bpm: 112, genre: 'Afrobeat' }
-  },
-  {
-    id: 'aud-acapella-words',
-    title: 'Neural Acapella (Words Only - Mute Beat)',
-    type: 'audio',
-    category: 'Stems',
-    duration: 30,
-    thumbnail: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&auto=format&fit=crop&q=60',
-    color: '#06b6d4',
-    description: 'Clean human singing words isolated with drums and bass silenced',
-    meta: { bpm: 112, genre: 'Acapella' }
-  },
-  {
-    id: 'aud-karaoke-words-muted',
-    title: 'Karaoke Beat (Original Words Muted)',
-    type: 'audio',
-    category: 'Stems',
-    duration: 30,
-    thumbnail: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=400&auto=format&fit=crop&q=60',
-    color: '#e11d48',
-    description: 'Vocal words cancelled via center-channel notch filter, keeping pure beat',
-    meta: { bpm: 112, genre: 'Instrumental' }
-  },
-  {
-    id: 'aud-southern-trap-swap',
-    title: 'Southern Trap 808 Style Shifter',
-    type: 'audio',
-    category: 'Music',
-    duration: 30,
-    thumbnail: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&auto=format&fit=crop&q=60',
-    color: '#8b5cf6',
-    description: '140 BPM Memphis/Atlanta heavy 808 slide bass with rolling hi-hats',
-    meta: { bpm: 140, genre: 'Southern Trap' }
-  },
-  {
-    id: 'aud-amapiano-logdrum',
-    title: 'Amapiano Bacardi Log Drum Shifter',
-    type: 'audio',
-    category: 'Music',
-    duration: 30,
-    thumbnail: 'https://images.unsplash.com/photo-1445985543469-433ec45754ac?w=400&auto=format&fit=crop&q=60',
-    color: '#10b981',
-    description: '113 BPM Pretoria log drum bass chords with ambient velvet pads',
-    meta: { bpm: 113, genre: 'Amapiano' }
-  },
-
   // Titles & Graphics
   {
     id: 'txt-kinetic-neon',
@@ -336,69 +279,10 @@ export const INITIAL_CLIPS: TimelineClip[] = [
     colorGrading: { exposure: 0, contrast: 25, saturation: 30, temperature: -5, tint: 0, lut: 'teal_orange' },
     color: '#8b5cf6',
     thumbnail: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=60'
-  },
-
-  // A1 Music Waveform (Connected to globalAudioEngine!)
-  {
-    id: 'clip-a1',
-    trackId: 'track-a1',
-    title: 'Lagos Afrobeat Groove (Stem)',
-    type: 'audio',
-    startTime: 0,
-    duration: 30.0,
-    sourceIn: 0,
-    sourceOut: 30.0,
-    speed: 1.0,
-    opacity: 1.0,
-    blendMode: 'normal',
-    transform: { scale: 1.0, x: 0, y: 0, rotation: 0, flipH: false, flipV: false },
-    colorGrading: { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, lut: 'none' },
-    audioProps: {
-      volume: 1.0,
-      muteWords: false,
-      muteBeat: false,
-      styleSwap: 'afrobeat_lagos',
-      fadeIn: 0,
-      fadeOut: 0
-    },
-    color: '#10b981',
-  },
-
-  // A2 Voice / Acapella Words
-  {
-    id: 'clip-a2',
-    trackId: 'track-a2',
-    title: 'Isolated Vocal Words (Acapella)',
-    type: 'audio',
-    startTime: 2.0,
-    duration: 26.0,
-    sourceIn: 0,
-    sourceOut: 26.0,
-    speed: 1.0,
-    opacity: 1.0,
-    blendMode: 'normal',
-    transform: { scale: 1.0, x: 0, y: 0, rotation: 0, flipH: false, flipV: false },
-    colorGrading: { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, lut: 'none' },
-    audioProps: {
-      volume: 1.1,
-      muteWords: false,
-      muteBeat: true, // Acapella Words Only!
-      styleSwap: 'none',
-      fadeIn: 0.5,
-      fadeOut: 1.0
-    },
-    color: '#06b6d4',
   }
 ];
 
-export const INITIAL_BEAT_MARKERS: BeatMarker[] = [
-  { id: 'bm-1', time: 0.0, label: 'Intro Kick', color: '#ea3838', type: 'beat' },
-  { id: 'bm-2', time: 4.28, label: 'Vocal Hook In', color: '#06b6d4', type: 'vocal_start' },
-  { id: 'bm-3', time: 8.57, label: 'Cut to Dance', color: '#f59e0b', type: 'scene_change' },
-  { id: 'bm-4', time: 17.14, label: 'AFROBEAT DROP', color: '#ec4899', type: 'drop' },
-  { id: 'bm-5', time: 21.42, label: 'Brass Flare', color: '#8b5cf6', type: 'beat' },
-  { id: 'bm-6', time: 25.71, label: 'Build Outro', color: '#10b981', type: 'beat' },
-];
+export const INITIAL_BEAT_MARKERS: BeatMarker[] = [];
 
 export const INITIAL_PROJECT: VizmotionProject = {
   id: 'proj-vizmotion-alpha',

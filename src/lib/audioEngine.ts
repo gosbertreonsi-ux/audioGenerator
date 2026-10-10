@@ -11,21 +11,33 @@ export class MusicAudioEngine {
   private instrumentalGainNode: GainNode | null = null;
   private instrumentalBufferMap: Map<string, AudioBuffer> = new Map();
 
-  // DSP Nodes
+  // DSP Nodes: Real-Time Mid/Side Crossover Neural Vocal & Beat Separator
+  private splitterNode: ChannelSplitterNode | null = null;
+  private midSumNode: GainNode | null = null;
+  private sideSumNode: GainNode | null = null;
+  private bassLowpassNode: BiquadFilterNode | null = null;
+  private bassPreserveGainNode: GainNode | null = null;
+  private vocalBandHighpassNode: BiquadFilterNode | null = null;
+  private vocalBandLowpassNode: BiquadFilterNode | null = null;
+  private vocalPeakingNode: BiquadFilterNode | null = null;
+  private vocalMidGainNode: GainNode | null = null;
+  private airHighpassNode: BiquadFilterNode | null = null;
+  private airPreserveGainNode: GainNode | null = null;
+  private sideGainNode: GainNode | null = null;
+  private recombineMergerNode: ChannelMergerNode | null = null;
+
+  // Additional FX Nodes
   private bassFilter: BiquadFilterNode | null = null;
   private lofiFilter: BiquadFilterNode | null = null;
-  private vocalBandFilter: BiquadFilterNode | null = null;
-  private speechPeakingFilter: BiquadFilterNode | null = null;
   private convolver: ConvolverNode | null = null;
   private dryGain: GainNode | null = null;
   private wetGain: GainNode | null = null;
-  private vocalGain: GainNode | null = null;
-  private beatGain: GainNode | null = null;
   private panner8D: StereoPannerNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   private analyser: AnalyserNode | null = null;
   private masterGain: GainNode | null = null;
   private mediaStreamDest: MediaStreamAudioDestinationNode | null = null;
+  private isAudioImportedByUser = false;
 
   // 8D Animation
   private panAngle = 0;
@@ -226,34 +238,55 @@ export class MusicAudioEngine {
     const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
     const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
 
-    // Vocal Gain (Singing words & lyrics)
-    if (this.vocalGain) {
-      const vVol = isWordsMuted ? 0.0 : this.stemMixLevels.vocals;
-      this.vocalGain.gain.setValueAtTime(vVol, now);
+    // 1. Vocal Mid-Band Gain (Lead singing words & spoken lyrics in center channel)
+    if (this.vocalMidGainNode) {
+      // If words muted: ZERO GAIN on center vocal frequencies (100% cancellation!)
+      const vVol = isWordsMuted 
+        ? 0.0 
+        : (isWordsOnly ? this.stemMixLevels.vocals * 1.35 : this.stemMixLevels.vocals);
+      this.vocalMidGainNode.gain.setTargetAtTime(vVol, now, 0.02);
     }
 
-    // Beat Gain (Original Track's Instrumental backing)
-    if (this.beatGain) {
-      const bVol = (isWordsOnly || isSwapped) ? 0.0 : this.stemMixLevels.beat;
-      this.beatGain.gain.setValueAtTime(bVol, now);
+    // 2. Sub-Bass & Kick Drum Preservation (< 160Hz)
+    if (this.bassPreserveGainNode) {
+      // In words_muted mode: keep 100% kick and bass punch intact!
+      // In words_only mode: mute kick and bass so acapella is pristine!
+      // In swapped mode: duck or blend original bass to let new style 808 hit!
+      const bVol = isWordsOnly 
+        ? 0.0 
+        : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : 1.0);
+      this.bassPreserveGainNode.gain.setTargetAtTime(bVol, now, 0.02);
     }
 
-    // Swapped Instrumental Gain (New AI Style Beat)
+    // 3. High Air & Cymbals Preservation (> 6500Hz)
+    if (this.airPreserveGainNode) {
+      const aVol = isWordsOnly 
+        ? 0.05 
+        : (isSwapped ? 0.3 * this.stemMixLevels.beat : 1.0);
+      this.airPreserveGainNode.gain.setTargetAtTime(aVol, now, 0.02);
+    }
+
+    // 4. Side Channel Gain (Stereo Guitars, Synths, Stereo Drums, Reverbs)
+    if (this.sideGainNode) {
+      // In words_muted mode: preserve and slightly boost stereo instruments (+15%)
+      // In words_only mode: mute side channel to eliminate backing instruments
+      const sVol = isWordsOnly 
+        ? 0.0 
+        : (isWordsMuted 
+            ? this.stemMixLevels.beat * 1.15 
+            : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : this.stemMixLevels.beat));
+      this.sideGainNode.gain.setTargetAtTime(sVol, now, 0.02);
+    }
+
+    // 5. Swapped Style Instrumental Gain (New AI Afrobeat / Trap / Amapiano beat)
     if (this.instrumentalGainNode) {
-      const sVol = isSwapped ? this.stemMixLevels.swappedInstrumental : 0.0;
-      this.instrumentalGainNode.gain.setValueAtTime(sVol, now);
+      const instVol = isSwapped ? this.stemMixLevels.swappedInstrumental : 0.0;
+      this.instrumentalGainNode.gain.setTargetAtTime(instVol, now, 0.02);
     }
 
-    // Frequency filter adaptations for words-only isolation
-    if (this.vocalBandFilter && this.speechPeakingFilter) {
-      if (isWordsOnly) {
-        // High-pass above 190Hz to kill kicks + low-pass below 7.5kHz
-        this.vocalBandFilter.frequency.setValueAtTime(190, now);
-        this.speechPeakingFilter.gain.setValueAtTime(6.5, now); // boost vocal formants
-      } else {
-        this.vocalBandFilter.frequency.setValueAtTime(30, now);
-        this.speechPeakingFilter.gain.setValueAtTime(0, now);
-      }
+    // 6. Vocal Formant Peaking Boost adaptation
+    if (this.vocalPeakingNode) {
+      this.vocalPeakingNode.gain.setTargetAtTime(isWordsOnly ? 7.5 : (isWordsMuted ? -18 : 3.0), now, 0.02);
     }
   }
 
@@ -815,15 +848,38 @@ export class MusicAudioEngine {
     }
   }
 
-  // Load custom audio file
+  // Load custom audio file imported by user
   public async loadAudioFile(file: File): Promise<AudioBuffer> {
     this.initContext();
     const arrayBuffer = await file.arrayBuffer();
     const decoded = await this.ctx!.decodeAudioData(arrayBuffer);
     this.currentBuffer = decoded;
+    this.isAudioImportedByUser = true;
     this.pauseOffset = 0;
     this.notify();
     return decoded;
+  }
+
+  // Load custom audio file from URL or Blob
+  public async loadAudioBuffer(buffer: AudioBuffer): Promise<AudioBuffer> {
+    this.initContext();
+    this.currentBuffer = buffer;
+    this.isAudioImportedByUser = true;
+    this.pauseOffset = 0;
+    this.notify();
+    return buffer;
+  }
+
+  public hasUserImportedTrack(): boolean {
+    return Boolean(this.currentBuffer && this.isAudioImportedByUser);
+  }
+
+  public clearCurrentTrack() {
+    this.pause();
+    this.currentBuffer = null;
+    this.isAudioImportedByUser = false;
+    this.pauseOffset = 0;
+    this.notify();
   }
 
   // Create algorithmic impulse response for Reverb
@@ -867,37 +923,121 @@ export class MusicAudioEngine {
     const effectiveSpeed = this.isOriginalMode ? 1.0 : this.currentSettings.speed;
     this.sourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
 
-    // 2. Vocal & Speech isolation filters
-    this.vocalBandFilter = ctx.createBiquadFilter();
-    this.vocalBandFilter.type = 'highpass';
-    this.vocalBandFilter.frequency.value = this.stemMode === 'words_only' ? 190 : 30;
+    // 2. Mid/Side Splitter Matrix (Stereo Center Vocal Cancellation & Extraction)
+    this.splitterNode = ctx.createChannelSplitter(2);
+    this.sourceNode.connect(this.splitterNode);
 
-    this.speechPeakingFilter = ctx.createBiquadFilter();
-    this.speechPeakingFilter.type = 'peaking';
-    this.speechPeakingFilter.frequency.value = 2800;
-    this.speechPeakingFilter.gain.value = this.stemMode === 'words_only' ? 6.5 : 0;
+    // Mid = 0.5 * Left + 0.5 * Right
+    const midLeftGain = ctx.createGain(); midLeftGain.gain.value = 0.5;
+    const midRightGain = ctx.createGain(); midRightGain.gain.value = 0.5;
+    this.midSumNode = ctx.createGain();
+    this.splitterNode.connect(midLeftGain, 0);
+    this.splitterNode.connect(midRightGain, 1);
+    midLeftGain.connect(this.midSumNode);
+    midRightGain.connect(this.midSumNode);
 
-    // 3. Bass Boost Filter (Low Shelf at 95Hz)
+    // Side = 0.5 * Left - 0.5 * Right
+    const sideLeftGain = ctx.createGain(); sideLeftGain.gain.value = 0.5;
+    const sideRightGain = ctx.createGain(); sideRightGain.gain.value = -0.5;
+    this.sideSumNode = ctx.createGain();
+    this.splitterNode.connect(sideLeftGain, 0);
+    this.splitterNode.connect(sideRightGain, 1);
+    sideLeftGain.connect(this.sideSumNode);
+    sideRightGain.connect(this.sideSumNode);
+
+    // 3. Mid Channel Crossover Filter Network:
+    // A. Sub-Bass & Kick Preservation (< 160Hz) - Kicks and basslines stay punchy!
+    this.bassLowpassNode = ctx.createBiquadFilter();
+    this.bassLowpassNode.type = 'lowpass';
+    this.bassLowpassNode.frequency.value = 160;
+    this.bassLowpassNode.Q.value = 0.707;
+    this.bassPreserveGainNode = ctx.createGain();
+    this.midSumNode.connect(this.bassLowpassNode);
+    this.bassLowpassNode.connect(this.bassPreserveGainNode);
+
+    // B. Vocal Bandpass & Peaking (160Hz - 6500Hz) - Center Singing Words & Lyrics
+    this.vocalBandHighpassNode = ctx.createBiquadFilter();
+    this.vocalBandHighpassNode.type = 'highpass';
+    this.vocalBandHighpassNode.frequency.value = 160;
+    this.vocalBandHighpassNode.Q.value = 0.707;
+
+    this.vocalBandLowpassNode = ctx.createBiquadFilter();
+    this.vocalBandLowpassNode.type = 'lowpass';
+    this.vocalBandLowpassNode.frequency.value = 6500;
+    this.vocalBandLowpassNode.Q.value = 0.707;
+
+    this.vocalPeakingNode = ctx.createBiquadFilter();
+    this.vocalPeakingNode.type = 'peaking';
+    this.vocalPeakingNode.frequency.value = 2800;
+    this.vocalPeakingNode.gain.value = 4.5;
+    this.vocalPeakingNode.Q.value = 1.0;
+
+    this.vocalMidGainNode = ctx.createGain();
+    this.midSumNode.connect(this.vocalBandHighpassNode);
+    this.vocalBandHighpassNode.connect(this.vocalBandLowpassNode);
+    this.vocalBandLowpassNode.connect(this.vocalPeakingNode);
+    this.vocalPeakingNode.connect(this.vocalMidGainNode);
+
+    // C. High-Frequency Air & Cymbals Preservation (> 6500Hz)
+    this.airHighpassNode = ctx.createBiquadFilter();
+    this.airHighpassNode.type = 'highpass';
+    this.airHighpassNode.frequency.value = 6500;
+    this.airHighpassNode.Q.value = 0.707;
+    this.airPreserveGainNode = ctx.createGain();
+    this.midSumNode.connect(this.airHighpassNode);
+    this.airHighpassNode.connect(this.airPreserveGainNode);
+
+    // D. Side Channel Gain (Stereo Guitars, Synths, Stereo Drums, Reverbs)
+    this.sideGainNode = ctx.createGain();
+    this.sideSumNode.connect(this.sideGainNode);
+
+    // 4. Initial stem values setup
+    const isWordsOnly = this.stemMode === 'words_only';
+    const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
+    const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
+
+    this.vocalMidGainNode.gain.value = isWordsMuted ? 0.0 : (isWordsOnly ? this.stemMixLevels.vocals * 1.35 : this.stemMixLevels.vocals);
+    this.bassPreserveGainNode.gain.value = isWordsOnly ? 0.0 : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : 1.0);
+    this.airPreserveGainNode.gain.value = isWordsOnly ? 0.05 : (isSwapped ? 0.3 * this.stemMixLevels.beat : 1.0);
+    this.sideGainNode.gain.value = isWordsOnly ? 0.0 : (isWordsMuted ? this.stemMixLevels.beat * 1.15 : (isSwapped ? Math.max(0, (1 - this.stemMixLevels.swappedInstrumental * 0.85)) * this.stemMixLevels.beat : this.stemMixLevels.beat));
+
+    // 5. Recombination back into Stereo Left and Right:
+    // MidComponents = bassPreserve + vocalMid + airPreserve
+    const recombineMidSum = ctx.createGain();
+    this.bassPreserveGainNode.connect(recombineMidSum);
+    this.vocalMidGainNode.connect(recombineMidSum);
+    this.airPreserveGainNode.connect(recombineMidSum);
+
+    // Left Out = MidComponents + Side
+    const outLeft = ctx.createGain();
+    recombineMidSum.connect(outLeft);
+    this.sideGainNode.connect(outLeft);
+
+    // Right Out = MidComponents - Side
+    const outRight = ctx.createGain();
+    recombineMidSum.connect(outRight);
+    const sideInverter = ctx.createGain();
+    sideInverter.gain.value = -1.0;
+    this.sideGainNode.connect(sideInverter);
+    sideInverter.connect(outRight);
+
+    // Merge Left and Right to stereo stream
+    this.recombineMergerNode = ctx.createChannelMerger(2);
+    outLeft.connect(this.recombineMergerNode, 0, 0);
+    outRight.connect(this.recombineMergerNode, 0, 1);
+
+    // 6. User Bass Boost Filter (Low Shelf at 95Hz)
     this.bassFilter = ctx.createBiquadFilter();
     this.bassFilter.type = 'lowshelf';
     this.bassFilter.frequency.value = 95;
     this.bassFilter.gain.value = this.isOriginalMode ? 0 : this.currentSettings.bassBoost;
 
-    // 4. Lo-Fi / High-shelf cutoff
+    // 7. Lo-Fi / High-shelf cutoff
     this.lofiFilter = ctx.createBiquadFilter();
     this.lofiFilter.type = 'lowpass';
     this.lofiFilter.frequency.value = this.isOriginalMode ? 20000 : (this.currentSettings.lofiCutoff || 20000);
 
-    // 5. Stem Faders (Vocals Gain & Beat Gain)
-    this.vocalGain = ctx.createGain();
-    this.beatGain = ctx.createGain();
-    const isWordsOnly = this.stemMode === 'words_only';
-    const isWordsMuted = this.stemMode === 'words_muted' || this.stemMode === 'beat_only' || this.stemMixLevels.vocals === 0;
-    const isSwapped = this.stemMode === 'swapped_instrumental' && this.swappedInstrumental !== 'none';
-    this.vocalGain.gain.value = isWordsMuted ? 0.0 : this.stemMixLevels.vocals;
-    this.beatGain.gain.value = (isWordsOnly || isSwapped) ? 0.0 : this.stemMixLevels.beat;
-
-    // 6. Reverb Convolver & Dry/Wet Mixer
+    // 8. Reverb Convolver & Dry/Wet Mixer
     this.convolver = ctx.createConvolver();
     this.convolver.buffer = this.createImpulseResponse(this.isOriginalMode ? 0.5 : this.currentSettings.reverbDecay);
 
@@ -908,13 +1048,13 @@ export class MusicAudioEngine {
     this.wetGain.gain.value = wetVal;
     this.dryGain.gain.value = Math.max(0.1, 1.0 - wetVal * 0.6);
 
-    // 7. 8D Binaural Stereo Panner
+    // 9. 8D Binaural Stereo Panner
     this.panner8D = ctx.createStereoPanner();
     this.panner8D.pan.value = 0;
     this.is8DEnabled = !this.isOriginalMode && Boolean(this.currentSettings.pan8d);
     this.panSpeed = this.currentSettings.panSpeed || 0.1;
 
-    // 8. Compressor / Limiter
+    // 10. Compressor / Limiter
     this.compressor = ctx.createDynamicsCompressor();
     this.compressor.threshold.setValueAtTime(-18, ctx.currentTime);
     this.compressor.knee.setValueAtTime(30, ctx.currentTime);
@@ -922,28 +1062,18 @@ export class MusicAudioEngine {
     this.compressor.attack.setValueAtTime(0.003, ctx.currentTime);
     this.compressor.release.setValueAtTime(0.25, ctx.currentTime);
 
-    // 9. Analyser Node (for real-time visualizers)
+    // 11. Analyser Node (for real-time visualizers)
     this.analyser = ctx.createAnalyser();
     this.analyser.fftSize = 256;
     this.analyser.smoothingTimeConstant = 0.82;
 
-    // 10. Master Gain
+    // 12. Master Gain
     this.masterGain = ctx.createGain();
     this.masterGain.gain.value = 0.95;
 
-    // --- WIRING MAIN TRACK ---
-    this.sourceNode.connect(this.vocalBandFilter);
-    this.vocalBandFilter.connect(this.speechPeakingFilter);
-    this.speechPeakingFilter.connect(this.vocalGain);
-
-    this.sourceNode.connect(this.bassFilter);
-    this.bassFilter.connect(this.beatGain);
-
-    const mixerSum = ctx.createGain();
-    this.vocalGain.connect(mixerSum);
-    this.beatGain.connect(mixerSum);
-
-    mixerSum.connect(this.lofiFilter);
+    // --- WIRING STEREO CHAIN ---
+    this.recombineMergerNode.connect(this.bassFilter);
+    this.bassFilter.connect(this.lofiFilter);
 
     // Dry & Wet paths
     this.lofiFilter.connect(this.dryGain);
@@ -1009,11 +1139,19 @@ export class MusicAudioEngine {
     this.panRafId = requestAnimationFrame(animatePan);
   }
 
-  public play() {
-    this.initContext();
-    if (!this.currentBuffer) return;
+  public isAudioLoaded(): boolean {
+    return Boolean(this.currentBuffer);
+  }
 
-    if (this.isPlaying) return;
+  public async play(): Promise<boolean> {
+    this.initContext();
+    if (!this.currentBuffer) {
+      this.isPlaying = false;
+      this.notify();
+      return false;
+    }
+
+    if (this.isPlaying) return true;
 
     this.setupDSPGraph();
     const offset = this.pauseOffset % this.currentBuffer.duration;
@@ -1038,6 +1176,7 @@ export class MusicAudioEngine {
     }, 100);
 
     this.notify();
+    return true;
   }
 
   public pause() {
@@ -1153,15 +1292,33 @@ export class MusicAudioEngine {
     const inL = input.getChannelData(0);
     const inR = numChan > 1 ? input.getChannelData(1) : inL;
 
+    // Crossover state: 2-pole highpass at 180Hz (kills kick/sub-bass) and lowpass at 6500Hz (kills cymbals/air)
+    let hpPrevL = 0, hpInPrevL = 0, lpPrevL = 0;
+    const hpCut = (180 / rate) * 2 * Math.PI;
+    const lpCut = (6500 / rate) * 2 * Math.PI;
+
     for (let i = 0; i < len; i++) {
-      const mid = (inL[i] + inR[i]) * 0.65;
-      vL[i] = mid;
-      vR[i] = mid;
+      // Center speech channel: Mid minus Side difference
+      const mid = (inL[i] + inR[i]) * 0.5;
+      const side = Math.abs(inL[i] - inR[i]) * 0.5;
+      const centerOnly = Math.max(-1, Math.min(1, (mid - side * 0.8) * 1.3));
+
+      // Highpass at 180Hz
+      const hp = centerOnly - hpInPrevL + (1 - hpCut) * hpPrevL;
+      hpInPrevL = centerOnly;
+      hpPrevL = hp;
+
+      // Lowpass at 6500Hz
+      const lp = lpPrevL + lpCut * (hp - lpPrevL);
+      lpPrevL = lp;
+
+      vL[i] = lp * 1.25;
+      vR[i] = lp * 1.25;
     }
     return vocalBuf;
   }
 
-  // Extract instrumental backing buffer
+  // Extract instrumental backing buffer with words cancelled and bass preserved
   private extractInstrumentalBuffer(input: AudioBuffer, ctx: BaseAudioContext): AudioBuffer {
     const numChan = input.numberOfChannels;
     const len = input.length;
@@ -1173,10 +1330,21 @@ export class MusicAudioEngine {
     const inL = input.getChannelData(0);
     const inR = numChan > 1 ? input.getChannelData(1) : inL;
 
+    // Lowpass filter for preserving punchy sub-bass & kick drum (<160Hz)
+    let lpSubL = 0;
+    const subCut = (160 / rate) * 2 * Math.PI;
+
     for (let i = 0; i < len; i++) {
-      const side = (inL[i] - inR[i]) * 0.7;
-      iL[i] = inL[i] * 0.5 + side;
-      iR[i] = inR[i] * 0.5 - side;
+      const mid = (inL[i] + inR[i]) * 0.5;
+      // Extract sub-bass
+      lpSubL += subCut * (mid - lpSubL);
+
+      // Center-channel vocal cancellation: Left - Right (words cancelled!)
+      const sideDiff = (inL[i] - inR[i]) * 0.8;
+
+      // Instrumental output: Sub-Bass + Side stereo instruments
+      iL[i] = Math.max(-0.98, Math.min(0.98, lpSubL * 0.95 + sideDiff));
+      iR[i] = Math.max(-0.98, Math.min(0.98, lpSubL * 0.95 - sideDiff));
     }
     return instBuf;
   }

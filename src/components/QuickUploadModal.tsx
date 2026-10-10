@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { X, Upload, Music, Sparkles, Check, Disc } from 'lucide-react';
 import { AudioTrack } from '../types';
-import { SAMPLE_TRACKS } from '../lib/constants';
 import { globalAudioEngine } from '../lib/audioEngine';
 
 interface QuickUploadModalProps {
@@ -109,37 +108,43 @@ export const QuickUploadModal: React.FC<QuickUploadModalProps> = ({
           </p>
         </div>
 
-        {/* Or load studio stems */}
+        {/* Pro Audio Engine Validation & Feature Highlights */}
         <div className="space-y-3">
-          <span className="text-xs font-bold text-[#8a686b] block">
-            OR LOAD PRE-MASTERED STUDIO DEMO STEMS:
+          <span className="text-xs font-bold text-[#8a686b] block uppercase tracking-wider">
+            AUTOMATIC AUDIO ENGINE CAPABILITIES UPON IMPORT:
           </span>
-          <div className="grid grid-cols-2 gap-2">
-            {SAMPLE_TRACKS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  onSelectTrack(t);
-                  if (t.genre.includes('Trap')) {
-                    globalAudioEngine.loadSyntheticTrack('cyber_trap');
-                  } else if (t.genre.includes('Lo-Fi')) {
-                    globalAudioEngine.loadSyntheticTrack('lofi_rain');
-                  } else {
-                    globalAudioEngine.loadSyntheticTrack('midnight_drive');
-                  }
-                  globalAudioEngine.play();
-                  onClose();
-                }}
-                className="p-3 rounded-xl bg-[#220d0f] hover:bg-[#2d1114] border border-[#371518] hover:border-[#ea3838] text-left transition-all group"
-              >
-                <div className="text-xs font-bold text-white group-hover:text-[#ff6b72] truncate">
-                  {t.title}
-                </div>
-                <div className="text-[10px] text-[#a67c7f] mt-0.5">
-                  {t.key} · {t.bpm} BPM · {t.genre}
-                </div>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="p-3 rounded-xl bg-[#220d0f] border border-[#371518] flex items-start gap-2.5">
+              <Sparkles className="w-4 h-4 text-[#10b981] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white">Mute Original Words</div>
+                <div className="text-[10px] text-[#a67c7f]">Center-channel vocal inversion keeping 100% kick & bass</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#220d0f] border border-[#371518] flex items-start gap-2.5">
+              <Disc className="w-4 h-4 text-[#f59e0b] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white">Music Style Shifter</div>
+                <div className="text-[10px] text-[#a67c7f]">Swap beat to Afrobeat, Southern Trap 808, Amapiano, Drill</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#220d0f] border border-[#371518] flex items-start gap-2.5">
+              <Music className="w-4 h-4 text-[#06b6d4] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white">Words Only (Acapella)</div>
+                <div className="text-[10px] text-[#a67c7f]">Extract clean speech & singing lyrics with formant boost</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#220d0f] border border-[#371518] flex items-start gap-2.5">
+              <Check className="w-4 h-4 text-[#ec4899] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-xs font-bold text-white">VIZMOTION 4K Editor</div>
+                <div className="text-[10px] text-[#a67c7f]">Sync cuts, beat-markers & kinetic lyrics to your song</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

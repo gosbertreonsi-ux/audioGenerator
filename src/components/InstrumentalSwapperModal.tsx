@@ -20,7 +20,7 @@ import {
   Globe
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset, StemMode, StemMixLevels } from '../types';
-import { INSTRUMENTAL_SWAP_OPTIONS, SAMPLE_TRACKS } from '../lib/constants';
+import { INSTRUMENTAL_SWAP_OPTIONS } from '../lib/constants';
 import { globalAudioEngine } from '../lib/audioEngine';
 
 interface InstrumentalSwapperModalProps {

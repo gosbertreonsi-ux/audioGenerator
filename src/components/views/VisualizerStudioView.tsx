@@ -28,7 +28,6 @@ import {
 import { AudioTrack, TransformationPreset, VideoVisualizerSettings } from '../../types';
 import { AudioVisualizerCanvas } from '../AudioVisualizerCanvas';
 import { globalAudioEngine } from '../../lib/audioEngine';
-import { SAMPLE_TRACKS } from '../../lib/constants';
 
 interface VisualizerStudioViewProps {
   currentTrack: AudioTrack;
@@ -509,31 +508,51 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
             </button>
           </div>
 
-          {/* Quick Track Switcher */}
+          {/* Current Imported Track Info */}
           <div className="flex items-center gap-2 bg-[#220c0e] px-3 py-1.5 rounded-2xl border border-[#3c1518]">
             <Music className="w-3.5 h-3.5 text-[#ff6b72]" />
-            <select
-              value={currentTrack.id}
-              onChange={(e) => {
-                const found = SAMPLE_TRACKS.find((t) => t.id === e.target.value);
-                if (found) {
-                  setCurrentTrack(found);
-                  if (onSelectTrack) onSelectTrack(found);
-                  setSettings((prev) => ({
-                    ...prev,
-                    titleText: found.title,
-                    artistText: found.artist,
-                  }));
-                }
-              }}
-              className="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer pr-2"
-            >
-              {SAMPLE_TRACKS.map((t) => (
-                <option key={t.id} value={t.id} className="bg-[#1b090b] text-white">
-                  {t.title} ({t.artist})
-                </option>
-              ))}
-            </select>
+            <span className="text-xs font-bold text-white max-w-[200px] truncate">
+              {currentTrack.id !== 'unloaded' ? currentTrack.title : 'No Song Imported'}
+            </span>
+            <label className="ml-1 px-2.5 py-1 rounded-xl bg-[#2e0f12] hover:bg-[#3d1417] text-[#ff6b72] hover:text-white border border-[#441619] text-[11px] font-bold cursor-pointer transition-all">
+              <span>{currentTrack.id !== 'unloaded' ? 'Change Song' : 'Import Audio'}</span>
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const buf = await globalAudioEngine.loadAudioFile(file);
+                    const newT: AudioTrack = {
+                      id: `upload-${Date.now()}`,
+                      title: file.name.replace(/\.[^/.]+$/, ''),
+                      artist: 'My Imported Music',
+                      duration: Math.round(buf.duration),
+                      bpm: 120,
+                      key: 'Detected',
+                      energy: 'High',
+                      vocals: 'Detected',
+                      lufs: -10,
+                      genre: 'User Track',
+                      coverUrl: '',
+                      sourceType: 'user_upload',
+                    };
+                    setCurrentTrack(newT);
+                    if (onSelectTrack) onSelectTrack(newT);
+                    setSettings((prev) => ({
+                      ...prev,
+                      titleText: newT.title,
+                      artistText: newT.artist,
+                    }));
+                    globalAudioEngine.play();
+                  } catch (err) {
+                    console.error('Audio load error', err);
+                  }
+                }}
+              />
+            </label>
           </div>
         </div>
       </div>

@@ -67,6 +67,7 @@ import { AudioTrack, TransformationPreset } from '../../types';
 
 interface VizmotionAIEditorProps {
   currentTrack: AudioTrack;
+  onUpdateTrack?: (track: AudioTrack) => void;
   activePreset: TransformationPreset;
   onOpenInstrumentalSwapper?: () => void;
   onOpenBeatMaker?: () => void;
@@ -76,6 +77,7 @@ interface VizmotionAIEditorProps {
 
 export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
   currentTrack,
+  onUpdateTrack,
   activePreset,
   onOpenInstrumentalSwapper,
   onOpenBeatMaker,
@@ -141,6 +143,7 @@ export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
   const animFrameRef = useRef<number | null>(null);
   const timelineContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedClip = project.clips.find(c => c.id === selectedClipId);
 
@@ -217,14 +220,92 @@ export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
     return () => unsub();
   }, [duration]);
 
-  const togglePlay = () => {
+  const handleImportAudioFile = async (file: File) => {
+    try {
+      showToast(`Decoding "${file.name}"...`, 'info');
+      const audioBuffer = await globalAudioEngine.loadAudioFile(file);
+      const songDuration = audioBuffer.duration;
+      setDuration(Math.max(10, Math.ceil(songDuration)));
+
+      const trackInfo: AudioTrack = {
+        id: `imported-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ''),
+        artist: 'My Imported Song',
+        duration: Math.round(songDuration),
+        bpm: 120,
+        key: 'Detected',
+        energy: 'High',
+        vocals: 'Detected',
+        lufs: -10,
+        genre: 'Imported Audio',
+        coverUrl: '',
+        sourceType: 'user_upload',
+      };
+
+      if (onUpdateTrack) {
+        onUpdateTrack(trackInfo);
+      }
+
+      // Add or replace A1 track clip on the timeline with the user's real audio
+      const newAudioClip: TimelineClip = {
+        id: `clip-imported-${Date.now()}`,
+        trackId: 'track-a1',
+        title: file.name,
+        type: 'audio',
+        startTime: 0,
+        duration: songDuration,
+        sourceIn: 0,
+        sourceOut: songDuration,
+        speed: 1.0,
+        opacity: 1.0,
+        blendMode: 'normal',
+        transform: { scale: 1.0, x: 0, y: 0, rotation: 0, flipH: false, flipV: false },
+        colorGrading: { exposure: 0, contrast: 0, saturation: 0, temperature: 0, tint: 0, lut: 'none' },
+        color: '#10b981',
+        audioProps: {
+          volume: 1.0,
+          muteWords: false,
+          muteBeat: false,
+          styleSwap: 'none',
+          fadeIn: 0,
+          fadeOut: 0,
+        }
+      };
+
+      const filteredClips = project.clips.filter(c => c.trackId !== 'track-a1');
+      const updatedProject: VizmotionProject = {
+        ...project,
+        duration: Math.max(30, Math.ceil(songDuration)),
+        clips: [...filteredClips, newAudioClip]
+      };
+
+      pushHistory(updatedProject);
+      setSelectedClipId(newAudioClip.id);
+      showToast(`"${file.name}" imported (${Math.floor(songDuration / 60)}m ${Math.floor(songDuration % 60)}s)! Press Play to listen.`, 'success');
+      globalAudioEngine.seek(0);
+      globalAudioEngine.play();
+      setIsPlaying(true);
+    } catch (err) {
+      console.error('Audio decode error:', err);
+      showToast('Could not decode audio file. Please try an MP3, WAV, or M4A format.', 'error');
+    }
+  };
+
+  const togglePlay = async () => {
     if (isPlaying) {
       globalAudioEngine.pause();
       setIsPlaying(false);
     } else {
+      if (!globalAudioEngine.isAudioLoaded()) {
+        showToast('Please import an audio song (MP3/WAV) first!', 'info');
+        audioFileInputRef.current?.click();
+        return;
+      }
       globalAudioEngine.seek(currentTime);
-      globalAudioEngine.play();
-      setIsPlaying(true);
+      const started = await globalAudioEngine.play();
+      if (started) {
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -386,7 +467,11 @@ export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
           const padX = 22;
           const padY = 12;
           ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-          ctx.roundRect(-metrics.width / 2 - padX, -fontSize / 2 - padY, metrics.width + padX * 2, fontSize + padY * 2, 8);
+          if (typeof (ctx as any).roundRect === 'function') {
+            (ctx as any).roundRect(-metrics.width / 2 - padX, -fontSize / 2 - padY, metrics.width + padX * 2, fontSize + padY * 2, 8);
+          } else {
+            ctx.rect(-metrics.width / 2 - padX, -fontSize / 2 - padY, metrics.width + padX * 2, fontSize + padY * 2);
+          }
           ctx.fill();
         }
 
@@ -706,19 +791,23 @@ export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
       const isImage = file.type.startsWith('image');
       const itemType = isVideo ? 'video' : isAudio ? 'audio' : 'image';
 
-      const newItem: StockMediaItem = {
-        id: `user-${Date.now()}-${Math.random()}`,
-        title: file.name,
-        type: itemType,
-        category: 'My Uploads',
-        duration: 15,
-        thumbnail: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&auto=format&fit=crop&q=60',
-        color: isVideo ? '#ea3838' : isAudio ? '#06b6d4' : '#10b981',
-        description: `Imported file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`
-      };
+      if (isAudio) {
+        handleImportAudioFile(file);
+      } else {
+        const newItem: StockMediaItem = {
+          id: `user-${Date.now()}-${Math.random()}`,
+          title: file.name,
+          type: itemType,
+          category: 'My Uploads',
+          duration: 15,
+          thumbnail: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&auto=format&fit=crop&q=60',
+          color: isVideo ? '#ea3838' : '#10b981',
+          description: `Imported file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`
+        };
 
-      setCustomMedia(prev => [newItem, ...prev]);
-      handleAddMediaToTimeline(newItem);
+        setCustomMedia(prev => [newItem, ...prev]);
+        handleAddMediaToTimeline(newItem);
+      }
     });
 
     showToast('File imported and placed on timeline!', 'success');

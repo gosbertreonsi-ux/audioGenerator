@@ -11,10 +11,11 @@ import {
   X,
   Volume2,
   Video,
-  Film
+  Film,
+  Upload
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset } from '../../types';
-import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
+import { PRESET_STYLES } from '../../lib/constants';
 import { globalAudioEngine } from '../../lib/audioEngine';
 import { NavTab } from '../NavigationDock';
 
@@ -25,6 +26,7 @@ interface DashboardViewProps {
   onSelectPreset: (preset: TransformationPreset) => void;
   onNavigateTab: (tab: NavTab) => void;
   onOpenMakeItAVibe: () => void;
+  onOpenQuickUpload?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -34,6 +36,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectPreset,
   onNavigateTab,
   onOpenMakeItAVibe,
+  onOpenQuickUpload,
 }) => {
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [downloadPaused, setDownloadPaused] = useState(false);
@@ -51,10 +54,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, []);
 
   const handleTogglePlay = async () => {
-    // If no buffer loaded yet, initialize synthetic demo track
-    const audioCtx = globalAudioEngine.getAudioContext();
-    if (!audioCtx) {
-      await globalAudioEngine.loadSyntheticTrack('midnight_drive');
+    // Only play user imported audio - if none imported, prompt user to import
+    if (!globalAudioEngine.hasUserImportedTrack() && !globalAudioEngine.isAudioLoaded()) {
+      if (onOpenQuickUpload) {
+        onOpenQuickUpload();
+      }
+      return;
     }
     globalAudioEngine.togglePlay();
   };
@@ -543,35 +548,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Track Switcher Pills */}
+      {/* Import User Music Bar */}
       <div className="pt-2">
-        <span className="text-xs font-semibold text-[#8a686b] block mb-2">
-          LOAD PRODUCTION STEM / TRACK:
-        </span>
-        <div className="flex flex-wrap gap-2">
-          {SAMPLE_TRACKS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => {
-                onSelectTrack(t);
-                // Also trigger synthetic track load matching genre
-                if (t.genre.includes('Trap')) {
-                  globalAudioEngine.loadSyntheticTrack('cyber_trap');
-                } else if (t.genre.includes('Lo-Fi')) {
-                  globalAudioEngine.loadSyntheticTrack('lofi_rain');
-                } else {
-                  globalAudioEngine.loadSyntheticTrack('midnight_drive');
-                }
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                currentTrack.id === t.id
-                  ? 'bg-[#ea3838] text-white border-[#ea3838] shadow-md shadow-[#ea3838]/30 font-bold'
-                  : 'bg-[#1e0a0d] text-[#c59c9f] hover:text-white border-[#371518]'
-              }`}
-            >
-              {t.title} ({t.key} · {t.bpm} BPM)
-            </button>
-          ))}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#220d0f] to-[#1a0709] border border-[#441619] flex flex-wrap items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#2e0f12] border border-[#ea3838]/40 flex items-center justify-center text-[#ff6b72]">
+              <Upload className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white uppercase tracking-wider">
+                {currentTrack.id !== 'unloaded' ? `CURRENT TRACK: ${currentTrack.title}` : 'NO SONG IMPORTED YET'}
+              </div>
+              <div className="text-[11px] text-[#a67c7f]">
+                {currentTrack.id !== 'unloaded' 
+                  ? `${currentTrack.bpm} BPM · ${currentTrack.key} · Ready for vocal muting & style shifting` 
+                  : 'Import your MP3, WAV or FLAC to play, mute original words & change styles'}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => onOpenQuickUpload?.()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff4d4d] hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-[#ea3838]/20 transition-all cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            {currentTrack.id !== 'unloaded' ? 'IMPORT ANOTHER SONG' : 'IMPORT SONG TO PLAY'}
+          </button>
         </div>
       </div>
     </div>

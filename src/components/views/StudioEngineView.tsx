@@ -17,7 +17,7 @@ import {
   Zap
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset, VocalModel } from '../../types';
-import { PRESET_STYLES, SAMPLE_TRACKS } from '../../lib/constants';
+import { PRESET_STYLES } from '../../lib/constants';
 import { globalAudioEngine } from '../../lib/audioEngine';
 import { AudioVisualizerCanvas } from '../AudioVisualizerCanvas';
 import { DownloadStemsModal } from '../DownloadStemsModal';
@@ -78,9 +78,10 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   }, []);
 
   const handlePlayToggle = async () => {
-    const ctx = globalAudioEngine.getAudioContext();
-    if (!ctx) {
-      await globalAudioEngine.loadSyntheticTrack('midnight_drive');
+    // Only play audio imported by the user
+    if (!globalAudioEngine.hasUserImportedTrack() && !globalAudioEngine.isAudioLoaded()) {
+      fileInputRef.current?.click();
+      return;
     }
     globalAudioEngine.togglePlay();
   };
@@ -711,38 +712,45 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
                 8D TUNES OFFICIAL PLAYLIST (LNK.TO/8DPLAYLIST)
               </h4>
             </div>
-            <a
-              href="https://lnk.to/8dplaylist"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] font-bold text-[#ff6b72] hover:underline"
-            >
-              Official Link ↗
-            </a>
+            <span className="text-[10px] font-bold text-[#ff6b72]">
+              Real-Time Binaural DSP
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {SAMPLE_TRACKS.filter((t) => t.id.startsWith('8d-')).map((t) => (
-              <button
-                key={t.id}
-                onClick={() => {
-                  onUpdateTrack(t);
-                  // Load synthetic track and activate 8D preset
-                  globalAudioEngine.loadSyntheticTrack('midnight_drive');
-                  const eightDPreset = PRESET_STYLES.find((p) => p.id === '8d_tunes_signature') || PRESET_STYLES[0];
-                  onUpdatePreset(eightDPreset);
-                  globalAudioEngine.setTransformation(eightDPreset);
-                  globalAudioEngine.play();
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
-                  currentTrack.id === t.id
-                    ? 'bg-[#ea3838] text-white border-[#ea3838] shadow-md shadow-[#ea3838]/30'
-                    : 'bg-[#240c0e] text-[#c59c9f] hover:text-white border-[#371518]'
-                }`}
-              >
-                {t.title}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+            <button
+              onClick={() => {
+                const next8D = !activePreset.pan8d;
+                handleParamChange('pan8d', next8D);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
+                activePreset.pan8d
+                  ? 'bg-[#ea3838] text-white border-[#ea3838] shadow-md shadow-[#ea3838]/30'
+                  : 'bg-[#240c0e] text-[#c59c9f] hover:text-white border-[#371518]'
+              }`}
+            >
+              8D Rotation: {activePreset.pan8d ? 'ACTIVE (360°)' : 'OFF (STEREO)'}
+            </button>
+            <button
+              onClick={() => handleParamChange('stereoWidth', activePreset.stereoWidth > 1.2 ? 1.0 : 1.7)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
+                activePreset.stereoWidth > 1.2
+                  ? 'bg-[#8b5cf6] text-white border-[#8b5cf6]'
+                  : 'bg-[#240c0e] text-[#c59c9f] hover:text-white border-[#371518]'
+              }`}
+            >
+              Wide Stereo: {activePreset.stereoWidth > 1.2 ? 'ULTRA WIDE (170%)' : 'NORMAL (100%)'}
+            </button>
+            <button
+              onClick={() => handleParamChange('bassBoost', activePreset.bassBoost > 5 ? 2.5 : 8.5)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all ${
+                activePreset.bassBoost > 5
+                  ? 'bg-[#f59e0b] text-white border-[#f59e0b]'
+                  : 'bg-[#240c0e] text-[#c59c9f] hover:text-white border-[#371518]'
+              }`}
+            >
+              Sub Bass: {activePreset.bassBoost > 5 ? '+8.5 dB PUNCH' : 'FLAT'}
+            </button>
           </div>
         </div>
       </div>

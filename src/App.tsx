@@ -20,13 +20,13 @@ import { VocalModelsModal } from './components/VocalModelsModal';
 import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
 import { InstrumentalSwapperModal } from './components/InstrumentalSwapperModal';
 import { BeatMakerStudioModal } from './components/BeatMakerStudioModal';
-import { SAMPLE_TRACKS, PRESET_STYLES, COMMUNITY_CREATORS } from './lib/constants';
+import { DEFAULT_UNLOADED_TRACK, PRESET_STYLES, COMMUNITY_CREATORS } from './lib/constants';
 import { AudioTrack, TransformationPreset, VocalModel } from './types';
 import { globalAudioEngine } from './lib/audioEngine';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('vizmotion');
-  const [currentTrack, setCurrentTrack] = useState<AudioTrack>(SAMPLE_TRACKS[0]);
+  const [currentTrack, setCurrentTrack] = useState<AudioTrack>(DEFAULT_UNLOADED_TRACK);
   const [activePreset, setActivePreset] = useState<TransformationPreset>(PRESET_STYLES[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
@@ -60,15 +60,10 @@ export default function App() {
     globalAudioEngine.setTransformation(vocalPreset);
   };
 
-  // Pre-load default synthetic audio engine so sounds are ready instantly
-  useEffect(() => {
-    globalAudioEngine.loadSyntheticTrack('midnight_drive').catch(console.error);
-  }, []);
-
   return (
-    <div className="min-h-screen w-full bg-[#0a0304] flex items-center justify-center p-0 md:p-3 lg:p-4 font-sans text-[#f4e8e8]">
-      {/* Outer Console Bezel / Tablet Chassis matching the uploaded screenshot */}
-      <div className="w-full h-full lg:h-[95vh] lg:max-w-[1600px] bg-[#140708] rounded-none md:rounded-[36px] lg:rounded-[42px] border-0 md:border-2 border-[#3a1517] shadow-[0_0_70px_rgba(234,56,56,0.18)] flex overflow-hidden relative">
+    <div className="h-screen w-full bg-[#0a0304] flex items-center justify-center p-0 font-sans text-[#f4e8e8] overflow-hidden">
+      {/* Outer Console Container */}
+      <div className="w-full h-full bg-[#140708] border-0 flex overflow-hidden relative">
         {/* Left Navigation Dock */}
         <NavigationDock
           activeTab={activeTab}
@@ -81,24 +76,27 @@ export default function App() {
 
         {/* Center Main Stage */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          {/* Header Bar */}
-          <HeaderBar
-            userName={userName}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onOpenExportsModal={() => setActiveTab('publish')}
-            onOpenVocalModels={() => setIsVocalModelsOpen(true)}
-            onOpenProfileModal={() => {
-              const name = prompt('Enter your producer/artist name:', userName);
-              if (name && name.trim()) setUserName(name.trim());
-            }}
-          />
+          {/* Header Bar - Shown on non-editor tabs */}
+          {activeTab !== 'vizmotion' && (
+            <HeaderBar
+              userName={userName}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onOpenExportsModal={() => setActiveTab('publish')}
+              onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+              onOpenProfileModal={() => {
+                const name = prompt('Enter your producer/artist name:', userName);
+                if (name && name.trim()) setUserName(name.trim());
+              }}
+            />
+          )}
 
           {/* Active View Switcher */}
           <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
             {activeTab === 'vizmotion' && (
               <VizmotionAIEditor
                 currentTrack={currentTrack}
+                onUpdateTrack={setCurrentTrack}
                 activePreset={activePreset}
                 onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
                 onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
@@ -115,6 +113,7 @@ export default function App() {
                 onSelectPreset={setActivePreset}
                 onNavigateTab={setActiveTab}
                 onOpenMakeItAVibe={() => setActiveTab('vibe')}
+                onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
               />
             )}
 
@@ -176,15 +175,17 @@ export default function App() {
           </main>
         </div>
 
-        {/* Right Collaborators Studio Rail */}
-        <CollaboratorsRail
-          collaborators={COMMUNITY_CREATORS}
-          onSelectCollaborator={(c) => {
-            if (c.currentTrack) {
-              setActiveTab('studio');
-            }
-          }}
-        />
+        {/* Right Collaborators Studio Rail - Shown only on dashboard/studio */}
+        {activeTab !== 'vizmotion' && (
+          <CollaboratorsRail
+            collaborators={COMMUNITY_CREATORS}
+            onSelectCollaborator={(c) => {
+              if (c.currentTrack) {
+                setActiveTab('studio');
+              }
+            }}
+          />
+        )}
       </div>
 
       {/* Quick Upload Modal */}
