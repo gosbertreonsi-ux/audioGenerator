@@ -12,7 +12,12 @@ import {
   Volume2,
   Video,
   Film,
-  Upload
+  Upload,
+  Download,
+  Loader2,
+  Check,
+  Layers,
+  Zap
 } from 'lucide-react';
 import { AudioTrack, TransformationPreset } from '../../types';
 import { PRESET_STYLES } from '../../lib/constants';
@@ -42,6 +47,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [downloadPaused, setDownloadPaused] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(82);
   const [isSavedBookmark, setIsSavedBookmark] = useState(false);
+  const [isExportingEdited, setIsExportingEdited] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  const handleDownloadEditedAudio = async () => {
+    if (!globalAudioEngine.isAudioLoaded()) {
+      onOpenQuickUpload?.();
+      return;
+    }
+    try {
+      setIsExportingEdited(true);
+      const wavBlob = await globalAudioEngine.renderAndExportWAV();
+      const url = URL.createObjectURL(wavBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTrack.title.replace(/\s+/g, '_')}_${activePreset.name.replace(/\s+/g, '_')}_EDITED.wav`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    } catch (err) {
+      console.error('Download error:', err);
+    } finally {
+      setIsExportingEdited(false);
+    }
+  };
 
   // Subscribe to audio engine
   React.useEffect(() => {
@@ -457,6 +487,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* NEW: 2-Song Beat Frequency Sync & Dynamic Compression Suite Card */}
+      <div className="p-5 rounded-3xl bg-gradient-to-r from-[#2a0e12] via-[#1f090c] to-[#250d11] border border-[#ea3838]/40 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#361116] border border-[#ea3838]/50 flex items-center justify-center text-[#ff6b72] shadow-lg shadow-[#ea3838]/20 shrink-0">
+            <Layers className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-[#ea3838] text-white text-[9px] font-black uppercase tracking-wider">
+                NEW FEATURE
+              </span>
+              <h4 className="text-sm font-black text-white">
+                2-Song Beat Frequency Sync & Compression Lab
+              </h4>
+            </div>
+            <p className="text-xs text-[#a67c7f] mt-0.5">
+              Upload two songs: lock both beats to the same frequency (<code className="text-[#ff7b82]">f_beat = BPM/60</code>) with synchronized punch & glue bus compression.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => onNavigateTab('dualsync')}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff4747] hover:brightness-110 text-white font-black text-xs shadow-lg shadow-[#ea3838]/25 transition-all whitespace-nowrap cursor-pointer shrink-0"
+        >
+          <Zap className="w-4 h-4 fill-current" />
+          <span>Launch 2-Song Beat Sync</span>
+        </button>
+      </div>
+
       {/* =========================================================
           BOTTOM ROW: LAST DOWNLOADS (Matches image bottom bar)
          ========================================================= */}
@@ -518,8 +578,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Action buttons (Pause/Play + Cancel X) */}
-          <div className="flex items-center gap-2 self-end md:self-center">
+          {/* Action buttons (Download Edited Audio + Pause/Play + Cancel X) */}
+          <div className="flex flex-wrap items-center gap-2 self-end md:self-center">
+            <button
+              onClick={handleDownloadEditedAudio}
+              disabled={isExportingEdited}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff4d4d] hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-[#ea3838]/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Download the exact edited audio file"
+            >
+              {isExportingEdited ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Rendering WAV...</span>
+                </>
+              ) : downloadSuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" />
+                  <span>Downloaded!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download Edited Audio</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => {
                 setDownloadPaused(!downloadPaused);

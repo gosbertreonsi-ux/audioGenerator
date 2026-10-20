@@ -32,6 +32,7 @@ interface StudioEngineViewProps {
   onOpenVideoStudio?: () => void;
   onOpenInstrumentalSwapper?: () => void;
   onOpenBeatMaker?: () => void;
+  onOpenDualSync?: () => void;
   activeVocalModel?: VocalModel | null;
 }
 
@@ -45,6 +46,7 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
   onOpenVideoStudio,
   onOpenInstrumentalSwapper,
   onOpenBeatMaker,
+  onOpenDualSync,
   activeVocalModel,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -437,22 +439,23 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
             <button
               onClick={handleExportWAV}
               disabled={isExportingWav}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#260e10] hover:bg-[#381417] text-white border border-[#4a1c20] hover:border-[#ea3838] text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Download the exact edited song audio file with all effects and transformations applied"
             >
               {isExportingWav ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-[#ff6b72]" />
-                  Rendering 32-bit DSP...
+                  Rendering Edited WAV...
                 </>
               ) : exportComplete ? (
                 <>
                   <Check className="w-4 h-4 text-emerald-400" />
-                  Downloaded WAV!
+                  Downloaded Edited WAV!
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4 text-[#ff6b72]" />
-                  Quick Master WAV
+                  Download Edited Audio (WAV)
                 </>
               )}
             </button>
@@ -460,11 +463,23 @@ export const StudioEngineView: React.FC<StudioEngineViewProps> = ({
             {/* Download Stems & Edited Vocals Button (Requested by user) */}
             <button
               onClick={() => setIsDownloadStemsOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ea3838] to-[#ff5252] text-white text-xs font-black shadow-lg shadow-[#ea3838]/40 hover:scale-105 transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#ea3838] to-[#ff5252] text-white text-xs font-black shadow-lg shadow-[#ea3838]/40 hover:scale-105 transition-all active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Download Stems & Edited Vocals
             </button>
+
+            {/* 2-Song Beat Frequency Sync & Compression Lab */}
+            {onOpenDualSync && (
+              <button
+                onClick={onOpenDualSync}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#2b0e12] hover:bg-[#3d1318] text-[#ff7b82] hover:text-white border border-[#52191e] hover:border-[#ea3838] text-xs font-black shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Upload two songs, lock their beat frequencies, and compress their beats together"
+              >
+                <Layers className="w-4 h-4 text-[#ea3838]" />
+                <span>2-Song Beat Sync & Compress</span>
+              </button>
+            )}
           </div>
         </div>
 

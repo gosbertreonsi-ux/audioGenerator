@@ -15,6 +15,7 @@ import { TrendDiscoveryView } from './components/views/TrendDiscoveryView';
 import { RightsCenterView } from './components/views/RightsCenterView';
 import { PublishingView } from './components/views/PublishingView';
 import { VizmotionAIEditor } from './components/views/VizmotionAIEditor';
+import { DualSongSyncView } from './components/views/DualSongSyncView';
 import { QuickUploadModal } from './components/QuickUploadModal';
 import { VocalModelsModal } from './components/VocalModelsModal';
 import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
@@ -128,7 +129,15 @@ export default function App() {
                 onOpenVideoStudio={() => setActiveTab('vizmotion')}
                 onOpenInstrumentalSwapper={() => setIsInstrumentalSwapperOpen(true)}
                 onOpenBeatMaker={() => setIsBeatMakerOpen(true)}
+                onOpenDualSync={() => setActiveTab('dualsync')}
                 activeVocalModel={activeVocalModel}
+              />
+            )}
+
+            {activeTab === 'dualsync' && (
+              <DualSongSyncView
+                currentTrack={currentTrack}
+                onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
               />
             )}
 

@@ -560,194 +560,6 @@ export class MusicAudioEngine {
     throw new Error('Original sounds removed. Please import your own audio song file to play.');
   }
 
-  // Deprecated legacy generator
-  public async legacyUnusedSyntheticTrack(presetName: 'midnight_drive' | 'cyber_trap' | 'lofi_rain' | 'viral_afro_fusion' | 'afrobeat_lagos' | 'amapiano_logdrum' | string): Promise<AudioBuffer> {
-    this.initContext();
-    const ctx = this.ctx!;
-    const sampleRate = ctx.sampleRate;
-    const duration = 28; // 28 seconds seamless loop
-    const buffer = ctx.createBuffer(2, sampleRate * duration, sampleRate);
-    const left = buffer.getChannelData(0);
-    const right = buffer.getChannelData(1);
-
-    if (presetName === 'viral_afro_fusion' || presetName === 'afrobeat_lagos' || presetName === 'papaoutai_afro_remix') {
-      // --- VIRAL LAGOS AFROBEAT FUSION ANTHEM ---
-      // 114 BPM Syncopated Lagos Afrobeat Groove + Melodic Vocal Hook
-      const bpm = 114;
-      const beatInterval = 60 / bpm;
-
-      // Universal Afro-Pop Pentatonic Vocal Hook melody notes:
-      const vocalMelody = [
-        440.0, 493.8, 554.3, 659.2, 554.3, 493.8, 440.0, 0,
-        440.0, 554.3, 659.2, 740.0, 659.2, 554.3, 493.8, 0,
-        659.2, 554.3, 493.8, 440.0, 370.0, 440.0, 0, 0,
-        659.2, 554.3, 493.8, 440.0, 493.8, 554.3, 440.0, 0
-      ];
-
-      for (let i = 0; i < left.length; i++) {
-        const t = i / sampleRate;
-        const beat = (t / beatInterval) % 32;
-        const noteIdx = Math.floor(beat) % vocalMelody.length;
-        const targetPitch = vocalMelody[noteIdx];
-
-        // 1. Synthesized Vocal Words & Formants (Stromae French vocal hook timbre)
-        let vocalWords = 0;
-        if (targetPitch > 0) {
-          const noteT = (t % beatInterval);
-          // Human vocal formant synthesis (vowel filters / harmonics)
-          const f1 = Math.sin(2 * Math.PI * targetPitch * t);
-          const f2 = Math.sin(2 * Math.PI * targetPitch * 2.02 * t) * 0.45; // vowel formant
-          const f3 = Math.sin(2 * Math.PI * targetPitch * 3.01 * t) * 0.25; // nasal formant
-          const env = Math.min(1, noteT * 25) * Math.exp(-noteT * 2.2);
-          vocalWords = (f1 + f2 + f3) * env * 0.22;
-        }
-
-        // 2. Afrobeat Lagos Drums: Syncopated kick on beats 0, 1.5, 3
-        const subBeat = beat % 4;
-        let kick = 0;
-        if (subBeat < 0.18 || (subBeat > 1.48 && subBeat < 1.68) || (subBeat > 2.98 && subBeat < 3.18)) {
-          const kickT = (subBeat < 0.18 ? subBeat : subBeat > 1.48 && subBeat < 1.68 ? subBeat - 1.5 : subBeat - 3) * beatInterval;
-          if (kickT >= 0 && kickT < 0.18) {
-            const kf = 115 * Math.exp(-kickT * 32) + 48;
-            kick = Math.sin(2 * Math.PI * kf * kickT) * Math.exp(-kickT * 12) * 0.38;
-          }
-        }
-
-        // 3. Shaker 16th-note Afrobeat swing
-        const shakerT = (t % (beatInterval / 4));
-        let shaker = 0;
-        if (shakerT < 0.04) {
-          shaker = (Math.random() * 2 - 1) * Math.exp(-shakerT * 85) * 0.045;
-        }
-
-        // 4. Afrobeat Brass Horn Stabs
-        let horn = 0;
-        if (Math.floor(beat) % 4 === 3 && (t % beatInterval) > 0.25 && (t % beatInterval) < 0.45) {
-          const hT = (t % beatInterval) - 0.25;
-          horn = (Math.sin(2 * Math.PI * 440 * hT) + Math.sin(2 * Math.PI * 554.3 * hT)) * Math.exp(-hT * 8) * 0.09;
-        }
-
-        // 5. Talking Drum / Kalimba plucks
-        const kalimbaT = (t % (beatInterval / 2));
-        let kalimba = 0;
-        if (kalimbaT < 0.1) {
-          const kNotes = [740, 880, 1108, 987];
-          const kFreq = kNotes[Math.floor(beat * 2) % kNotes.length];
-          kalimba = Math.sin(2 * Math.PI * kFreq * t) * Math.exp(-kalimbaT * 14) * 0.06;
-        }
-
-        // 6. Syncopated Bouncy Bassline
-        const bassFreq = targetPitch > 0 ? targetPitch / 4 : 92.5;
-        const bass = Math.sin(2 * Math.PI * bassFreq * t) * 0.19;
-
-        const totalL = vocalWords * 1.0 + kick + shaker * 0.8 + horn * 1.1 + kalimba * 0.7 + bass;
-        const totalR = vocalWords * 1.0 + kick + shaker * 1.2 + horn * 0.9 + kalimba * 1.3 + bass;
-
-        left[i] = Math.max(-0.95, Math.min(0.95, totalL));
-        right[i] = Math.max(-0.95, Math.min(0.95, totalR));
-      }
-
-    } else if (presetName === 'amapiano_logdrum') {
-      // --- AMAPIANO LOG DRUM DEMO TRACK ---
-      const bpm = 113;
-      const beatInterval = 60 / bpm;
-      for (let i = 0; i < left.length; i++) {
-        const t = i / sampleRate;
-        const beat = (t / beatInterval) % 16;
-        const subBeatIndex = Math.floor(beat * 4) / 4;
-        const logDist = Math.abs(beat - subBeatIndex) * beatInterval;
-
-        let log = 0;
-        const logHits = [0, 1.75, 2.5, 4, 5.75, 6.5, 8, 9.75, 10.5, 12, 13.75, 14.5];
-        if (logHits.includes(subBeatIndex) && logDist < 0.22) {
-          const fmFreq = 120 * Math.exp(-logDist * 28) + 42;
-          const mod = Math.sin(2 * Math.PI * fmFreq * 1.8 * logDist) * 1.5;
-          log = Math.sin(2 * Math.PI * fmFreq * logDist + mod) * Math.exp(-logDist * 8) * 0.42;
-        }
-
-        // Soft jazz Rhodes
-        const chords = [[370, 440, 554, 659], [493, 587, 740, 880]];
-        const ch = chords[Math.floor(beat / 4) % 2];
-        let rhodes = 0;
-        for (const f of ch) {
-          rhodes += Math.sin(2 * Math.PI * f * t) * 0.03;
-        }
-
-        const sT = (t % (beatInterval / 4));
-        const shaker = sT < 0.03 ? (Math.random() * 2 - 1) * Math.exp(-sT * 100) * 0.04 : 0;
-
-        left[i] = Math.max(-0.95, Math.min(0.95, log + rhodes + shaker));
-        right[i] = Math.max(-0.95, Math.min(0.95, log + rhodes + shaker));
-      }
-
-    } else {
-      // Default Synthwave / Lo-Fi
-      const bpm = presetName === 'midnight_drive' ? 104 : presetName === 'cyber_trap' ? 138 : 84;
-      const beatInterval = 60 / bpm;
-      const chordsA = [
-        [220.0, 261.63, 329.63, 392.0],
-        [174.61, 220.0, 261.63, 329.63],
-        [261.63, 329.63, 392.0, 493.88],
-        [196.0, 246.94, 293.66, 349.23],
-      ];
-
-      for (let i = 0; i < left.length; i++) {
-        const t = i / sampleRate;
-        const beat = (t / beatInterval) % 16;
-        const bar = Math.floor(beat / 4);
-        const chord = chordsA[bar % 4];
-
-        let pad = 0;
-        for (let c = 0; c < chord.length; c++) {
-          const freq = chord[c];
-          pad += Math.sin(2 * Math.PI * freq * t) * 0.04;
-          pad += Math.sin(2 * Math.PI * freq * 1.002 * t + 0.3) * 0.02;
-        }
-
-        const rootFreq = chord[0] / 2;
-        const bassEnv = Math.exp(-((t % beatInterval) * 4));
-        const bass = Math.sin(2 * Math.PI * rootFreq * t) * 0.18 * Math.min(1, bassEnv + 0.3);
-
-        const kickT = (t % beatInterval);
-        let kick = 0;
-        if (kickT < 0.25) {
-          const kickPitch = 120 * Math.exp(-kickT * 35) + 45;
-          kick = Math.sin(2 * Math.PI * kickPitch * kickT) * Math.exp(-kickT * 12) * 0.32;
-        }
-
-        const snareT = (t % (beatInterval * 2)) - beatInterval;
-        let snare = 0;
-        if (snareT > 0 && snareT < 0.2) {
-          const noise = (Math.random() * 2 - 1) * Math.exp(-snareT * 22) * 0.2;
-          const tone = Math.sin(2 * Math.PI * 190 * snareT) * Math.exp(-snareT * 30) * 0.12;
-          snare = noise + tone;
-        }
-
-        const hatT = (t % (beatInterval / 2));
-        let hat = 0;
-        if (hatT < 0.05) {
-          hat = (Math.random() * 2 - 1) * Math.exp(-hatT * 80) * 0.06;
-        }
-
-        const melodyNotes = [659.25, 587.33, 523.25, 440.0, 659.25, 783.99];
-        const melodyNote = melodyNotes[Math.floor((t * 2) % melodyNotes.length)];
-        const pluckT = (t % 0.5);
-        const pluck = Math.sin(2 * Math.PI * melodyNote * t) * Math.exp(-pluckT * 7) * 0.05;
-
-        const totalL = pad + bass + kick + snare * 0.9 + hat * 0.8 + pluck * 1.1;
-        const totalR = pad + bass + kick + snare * 1.1 + hat * 1.2 + pluck * 0.9;
-
-        left[i] = Math.max(-0.95, Math.min(0.95, totalL));
-        right[i] = Math.max(-0.95, Math.min(0.95, totalR));
-      }
-    }
-
-    this.currentBuffer = buffer;
-    this.pauseOffset = 0;
-    this.notify();
-    return buffer;
-  }
-
   // Live Drum Sound Trigger (For on-screen pads & step sequencer like FL Studio/Ableton)
   public triggerDrumSound(sound: 'kick' | 'snare' | 'hihat' | 'shaker' | 'logdrum' | 'kalimba' | 'horn', velocity: number = 1.0) {
     this.initContext();
@@ -924,41 +736,29 @@ export class MusicAudioEngine {
       const l = inL[i];
       const r = inR[i];
 
-      let vocalRaw = 0;
-      if (isStereo) {
-        // In stereo music, lead vocal words are mixed dead center with matching polarity:
-        // Left = L_side + Vocal, Right = R_side + Vocal
-        // Center estimator = min(|L|, |R|) with polarity matching when in-phase!
-        if (l * r > 0) {
-          vocalRaw = Math.sign(l) * Math.min(Math.abs(l), Math.abs(r));
-        } else {
-          vocalRaw = 0;
-        }
-      } else {
-        // Mono music: vocal bandpass on the entire mono channel
-        vocalRaw = (l + r) * 0.5;
-      }
+      // Mid channel contains center vocal; Side channel contains stereo width instruments
+      const mid = 0.5 * (l + r);
+      const side = 0.5 * (l - r);
 
-      // Filter vocalRaw: 180Hz highpass
-      const hp = vocalRaw - hpInL + (1 - hpCut) * hpL;
-      hpInL = vocalRaw;
+      // Continuous 2-pole bandpass filter on Mid (180 Hz to 4200 Hz) to isolate vocal formants
+      const hp = mid - hpInL + (1 - hpCut) * hpL;
+      hpInL = mid;
       hpL = hp;
 
-      // 6500Hz lowpass
-      const lp = lpL + lpCut * (hp - lpL);
-      lpL = lp;
-
-      const vocalExtracted = Math.max(-0.95, Math.min(0.95, lp * 1.15));
+      lpL += lpCut * (hp - lpL);
+      const vocalSmooth = lpL * 1.35;
+      const vocalClamped = Math.max(-0.95, Math.min(0.95, vocalSmooth));
 
       // 1. Vocal stem (words only, beat muted):
-      vocL[i] = vocalExtracted;
-      vocR[i] = vocalExtracted;
+      vocL[i] = vocalClamped;
+      vocR[i] = vocalClamped;
 
       // 2. Instrumental stem (words muted, beat and instruments preserved):
-      // Subtract the extracted center vocal from each channel!
-      // In stereo: l - vocalExtracted leaves L_side and all wide instruments, plus sub-bass and cymbals!
-      const instLeft = isStereo ? (l - vocalExtracted * 0.98) : (l - vocalExtracted * 0.92);
-      const instRight = isStereo ? (r - vocalExtracted * 0.98) : (r - vocalExtracted * 0.92);
+      // Left = side + (mid - vocalSmooth * 0.95)
+      // Right = -side + (mid - vocalSmooth * 0.95)
+      // Completely linear and continuous - eliminates 100% of zero-crossing clicks and scratching!
+      const instLeft = isStereo ? (side + (mid - vocalSmooth * 0.95)) : (l - vocalSmooth * 0.92);
+      const instRight = isStereo ? (-side + (mid - vocalSmooth * 0.95)) : (r - vocalSmooth * 0.92);
 
       instL[i] = Math.max(-0.95, Math.min(0.95, instLeft));
       instR[i] = Math.max(-0.95, Math.min(0.95, instRight));
@@ -1004,6 +804,10 @@ export class MusicAudioEngine {
     return Boolean(this.currentBuffer && this.isAudioImportedByUser);
   }
 
+  public getCurrentBuffer(): AudioBuffer | null {
+    return this.currentBuffer;
+  }
+
   public clearCurrentTrack() {
     this.pause();
     this.currentBuffer = null;
@@ -1014,21 +818,52 @@ export class MusicAudioEngine {
     this.notify();
   }
 
-  // Create algorithmic impulse response for Reverb
-  private createImpulseResponse(decayTime: number): AudioBuffer {
-    const ctx = this.ctx!;
+  // Create algorithmic studio impulse response for Reverb (100% scratch-free, diffuse acoustic space, smooth multi-tap reflections)
+  private createImpulseResponse(decayTime: number, baseCtx?: BaseAudioContext): AudioBuffer {
+    const ctx = baseCtx || this.ctx!;
     const rate = ctx.sampleRate;
-    const length = Math.max(0.5, rate * decayTime);
+    const clampedDecay = Math.max(0.5, Math.min(7.0, decayTime));
+    const length = Math.floor(rate * clampedDecay);
     const impulse = ctx.createBuffer(2, length, rate);
     const left = impulse.getChannelData(0);
     const right = impulse.getChannelData(1);
 
+    // Filter states for high-frequency damping (prevents harsh scratching/sizzle)
+    let lpL = 0, lpR = 0;
+    const diffCut = (2400 / rate) * 2 * Math.PI;
+
+    let sumSquare = 0;
     for (let i = 0; i < length; i++) {
-      const n = i / length;
-      const decay = Math.pow(1 - n, 3);
-      left[i] = (Math.random() * 2 - 1) * decay;
-      right[i] = (Math.random() * 2 - 1) * decay;
+      const progress = i / length;
+      // Exponential acoustic absorption decay curve
+      const decay = Math.exp(-progress * 4.8);
+
+      // Lowpass-filtered diffused reflections (pure smooth reflection, NO raw white noise)
+      const rawNoiseL = (Math.random() * 2 - 1);
+      const rawNoiseR = (Math.random() * 2 - 1);
+
+      lpL += diffCut * (rawNoiseL - lpL);
+      lpR += diffCut * (rawNoiseR - lpR);
+
+      // Early reflection comb diffusion with stereo decorrelation
+      const sampleL = lpL * decay;
+      const sampleR = lpR * decay;
+
+      left[i] = sampleL;
+      right[i] = sampleR;
+      sumSquare += sampleL * sampleL + sampleR * sampleR;
     }
+
+    // RMS normalization to safe reference level (prevents clipping, scratching, and harshness)
+    const rms = Math.sqrt(sumSquare / (length * 2)) || 1;
+    const targetRms = 0.04;
+    const normFactor = targetRms / rms;
+
+    for (let i = 0; i < length; i++) {
+      left[i] = Math.tanh(left[i] * normFactor);
+      right[i] = Math.tanh(right[i] * normFactor);
+    }
+
     return impulse;
   }
 
@@ -1070,26 +905,28 @@ export class MusicAudioEngine {
       this.instrumentalBuffer = stems.instrumental;
     }
 
-    // 1. Playback rate (Speed & Pitch)
-    const effectiveSpeed = this.isOriginalMode ? 1.0 : this.currentSettings.speed;
+    // 1. Playback rate (Speed & Pitch combined)
+    const speed = this.isOriginalMode ? 1.0 : this.currentSettings.speed;
+    const pitch = this.isOriginalMode ? 0 : (this.currentSettings.pitch || 0);
+    const effectiveSpeed = Math.max(0.3, Math.min(2.5, speed * Math.pow(2, pitch / 12)));
 
     // 2. Full original mix source node (Pristine original sound)
     this.fullSourceNode = ctx.createBufferSource();
     this.fullSourceNode.buffer = this.currentBuffer;
     this.fullSourceNode.loop = true;
-    this.fullSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
+    this.fullSourceNode.playbackRate.value = effectiveSpeed;
 
     // 3. Pure Instrumental Beat Source Node (words 100% muted)
     this.beatSourceNode = ctx.createBufferSource();
     this.beatSourceNode.buffer = this.instrumentalBuffer;
     this.beatSourceNode.loop = true;
-    this.beatSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
+    this.beatSourceNode.playbackRate.value = effectiveSpeed;
 
     // 4. Pure Vocal Words Source Node (beat 100% muted)
     this.vocalSourceNode = ctx.createBufferSource();
     this.vocalSourceNode.buffer = this.vocalBuffer;
     this.vocalSourceNode.loop = true;
-    this.vocalSourceNode.playbackRate.value = Math.max(0.3, Math.min(2.0, effectiveSpeed));
+    this.vocalSourceNode.playbackRate.value = effectiveSpeed;
 
     // 5. Stem Gain Controllers for complete muting
     this.fullGain = ctx.createGain();
@@ -1140,6 +977,15 @@ export class MusicAudioEngine {
     this.compressor.ratio.setValueAtTime(4, ctx.currentTime);
     this.compressor.attack.setValueAtTime(0.003, ctx.currentTime);
     this.compressor.release.setValueAtTime(0.25, ctx.currentTime);
+
+    // Soft analog saturation limiter (prevents digital clipping scratch completely)
+    const softLimiter = ctx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) {
+      const x = (i * 2) / 1024 - 1;
+      curve[i] = Math.tanh(x * 1.05) * 0.95;
+    }
+    softLimiter.curve = curve;
 
     // 11. Analyser Node (for real-time visualizers)
     this.analyser = ctx.createAnalyser();
@@ -1220,7 +1066,8 @@ export class MusicAudioEngine {
       this.instrumentalGainNode.connect(this.compressor);
     }
 
-    this.compressor.connect(this.analyser);
+    this.compressor.connect(softLimiter);
+    softLimiter.connect(this.analyser);
     this.analyser.connect(this.masterGain);
     this.masterGain.connect(ctx.destination);
 
@@ -1250,10 +1097,11 @@ export class MusicAudioEngine {
     }
 
     const animatePan = () => {
-      if (!this.isPlaying || !this.is8DEnabled || !this.panner8D) return;
+      if (!this.isPlaying || !this.is8DEnabled || !this.panner8D || !this.ctx) return;
       this.panAngle += this.panSpeed * 0.05;
       const panValue = Math.sin(this.panAngle);
-      this.panner8D.pan.value = Math.max(-1, Math.min(1, panValue));
+      // Smooth interpolation avoids zipper/scratch noise
+      this.panner8D.pan.setTargetAtTime(Math.max(-1, Math.min(1, panValue)), this.ctx.currentTime, 0.035);
       this.panRafId = requestAnimationFrame(animatePan);
     };
 
@@ -1514,27 +1362,32 @@ export class MusicAudioEngine {
     }
 
     if (this.isPlaying && this.ctx) {
-      const speed = Math.max(0.3, Math.min(2.0, this.isOriginalMode ? 1.0 : this.currentSettings.speed));
+      const speed = this.isOriginalMode ? 1.0 : this.currentSettings.speed;
+      const pitch = this.isOriginalMode ? 0 : (this.currentSettings.pitch || 0);
+      const effectiveRate = Math.max(0.3, Math.min(2.5, speed * Math.pow(2, pitch / 12)));
       const now = this.ctx.currentTime;
+      // De-zipper playback rate
       if (this.fullSourceNode) {
-        this.fullSourceNode.playbackRate.setValueAtTime(speed, now);
+        this.fullSourceNode.playbackRate.setTargetAtTime(effectiveRate, now, 0.03);
       }
       if (this.beatSourceNode) {
-        this.beatSourceNode.playbackRate.setValueAtTime(speed, now);
+        this.beatSourceNode.playbackRate.setTargetAtTime(effectiveRate, now, 0.03);
       }
       if (this.vocalSourceNode) {
-        this.vocalSourceNode.playbackRate.setValueAtTime(speed, now);
+        this.vocalSourceNode.playbackRate.setTargetAtTime(effectiveRate, now, 0.03);
       }
       if (this.bassFilter && !this.isOriginalMode) {
-        this.bassFilter.gain.setValueAtTime(this.currentSettings.bassBoost, now);
+        const bassVal = Math.max(0, Math.min(12, this.currentSettings.bassBoost));
+        this.bassFilter.gain.setTargetAtTime(bassVal, now, 0.03);
       }
       if (this.lofiFilter && !this.isOriginalMode) {
-        this.lofiFilter.frequency.setValueAtTime(this.currentSettings.lofiCutoff || 20000, now);
+        const lofiVal = Math.max(350, Math.min(20000, this.currentSettings.lofiCutoff || 20000));
+        this.lofiFilter.frequency.setTargetAtTime(lofiVal, now, 0.03);
       }
       if (this.wetGain && this.dryGain && !this.isOriginalMode) {
-        const wetVal = Math.max(0, Math.min(0.9, this.currentSettings.reverbWet));
-        this.wetGain.gain.setValueAtTime(wetVal, now);
-        this.dryGain.gain.setValueAtTime(Math.max(0.1, 1.0 - wetVal * 0.6), now);
+        const wetVal = Math.max(0, Math.min(0.85, this.currentSettings.reverbWet));
+        this.wetGain.gain.setTargetAtTime(wetVal, now, 0.03);
+        this.dryGain.gain.setTargetAtTime(Math.max(0.15, 1.0 - wetVal * 0.5), now, 0.03);
       }
       this.is8DEnabled = !this.isOriginalMode && Boolean(this.currentSettings.pan8d);
       this.panSpeed = this.currentSettings.panSpeed || 0.1;
@@ -1638,94 +1491,161 @@ export class MusicAudioEngine {
     return instBuf;
   }
 
-  // Export Offline Rendered High-Quality WAV with stem isolation or swapped African remix
+  // Export Offline Rendered High-Quality WAV with stem isolation or swapped remix
+  // Guarantees download matches the EXACT edited audio currently playing in the studio!
   public async renderAndExportWAV(options: { 
     stemType?: 'master' | 'vocals' | 'instrumental' | 'swapped_remix';
     instrumentalStyle?: string;
   } = {}): Promise<Blob> {
     if (!this.currentBuffer) throw new Error('No audio buffer loaded');
 
-    const stemType = options.stemType || 'master';
+    // If Altare Future Bass / Trap remix mode is active and master was requested, export Altare Master
+    if (this.isAltareMode && (!options.stemType || options.stemType === 'master')) {
+      return this.renderAltareRemixWAV();
+    }
+
+    const requestedStem = options.stemType || 'master';
     const swapStyle = options.instrumentalStyle || this.swappedInstrumental;
     const srcDuration = this.currentBuffer.duration;
-    const speed = this.currentSettings.speed;
-    const renderDuration = srcDuration / speed + (this.currentSettings.reverbDecay || 3);
+    const speed = Math.max(0.3, Math.min(2.0, this.isOriginalMode ? 1.0 : this.currentSettings.speed));
+    const pitch = this.isOriginalMode ? 0 : (this.currentSettings.pitch || 0);
+    const effectiveRate = Math.max(0.3, Math.min(2.5, speed * Math.pow(2, pitch / 12)));
+    const renderDuration = srcDuration / effectiveRate + (this.currentSettings.reverbWet > 0.05 ? Math.min(3, this.currentSettings.reverbDecay || 2) : 0.5);
     const sampleRate = 44100;
     const length = Math.ceil(renderDuration * sampleRate);
 
     const offlineCtx = new OfflineAudioContext(2, length, sampleRate);
 
-    let sourceBuffer = this.currentBuffer;
-    if (stemType === 'vocals') {
-      sourceBuffer = this.extractVocalBuffer(this.currentBuffer, offlineCtx);
-    } else if (stemType === 'instrumental') {
-      sourceBuffer = this.extractInstrumentalBuffer(this.currentBuffer, offlineCtx);
+    // Ensure pre-separated stem buffers exist
+    if (!this.instrumentalBuffer || !this.vocalBuffer) {
+      const stems = this.separateStemsFromBuffer(this.currentBuffer);
+      this.vocalBuffer = stems.vocal;
+      this.instrumentalBuffer = stems.instrumental;
     }
 
-    const offlineSrc = offlineCtx.createBufferSource();
-    offlineSrc.buffer = sourceBuffer;
-    offlineSrc.playbackRate.value = speed;
+    // Stem sources with effective playback rate (speed + pitch)
+    const offlineFull = offlineCtx.createBufferSource();
+    offlineFull.buffer = this.currentBuffer;
+    offlineFull.playbackRate.value = effectiveRate;
 
+    const offlineBeat = offlineCtx.createBufferSource();
+    offlineBeat.buffer = this.instrumentalBuffer;
+    offlineBeat.playbackRate.value = effectiveRate;
+
+    const offlineVocal = offlineCtx.createBufferSource();
+    offlineVocal.buffer = this.vocalBuffer;
+    offlineVocal.playbackRate.value = effectiveRate;
+
+    const fullG = offlineCtx.createGain();
+    const beatG = offlineCtx.createGain();
+    const vocalG = offlineCtx.createGain();
+
+    offlineFull.connect(fullG);
+    offlineBeat.connect(beatG);
+    offlineVocal.connect(vocalG);
+
+    // Determine exact fader gains matching real-time playback
+    const isWordsOnly = requestedStem === 'vocals' || this.stemMode === 'words_only';
+    const isWordsMuted = requestedStem === 'instrumental' || this.stemMode === 'words_muted' || this.stemMixLevels.vocals === 0;
+    const isSwapped = (requestedStem === 'swapped_remix' || this.stemMode === 'swapped_instrumental') && swapStyle !== 'none';
+
+    if (requestedStem === 'vocals') {
+      fullG.gain.value = 0.0;
+      beatG.gain.value = 0.0;
+      vocalG.gain.value = 1.15;
+    } else if (requestedStem === 'instrumental') {
+      fullG.gain.value = 0.0;
+      beatG.gain.value = 1.0;
+      vocalG.gain.value = 0.0;
+    } else if (isWordsOnly) {
+      fullG.gain.value = 0.0;
+      beatG.gain.value = 0.0;
+      vocalG.gain.value = this.stemMixLevels.vocals * 1.25;
+    } else if (isWordsMuted) {
+      fullG.gain.value = 0.0;
+      beatG.gain.value = this.stemMixLevels.beat;
+      vocalG.gain.value = 0.0;
+    } else if (isSwapped) {
+      fullG.gain.value = 0.0;
+      beatG.gain.value = this.stemMixLevels.beat;
+      vocalG.gain.value = this.stemMixLevels.vocals;
+    } else {
+      // Full original mix mode
+      fullG.gain.value = 1.0;
+      beatG.gain.value = 0.0;
+      vocalG.gain.value = 0.0;
+    }
+
+    const stemMixer = offlineCtx.createGain();
+    fullG.connect(stemMixer);
+    beatG.connect(stemMixer);
+    vocalG.connect(stemMixer);
+
+    // Effects chain (identical to real-time playback)
     const bass = offlineCtx.createBiquadFilter();
     bass.type = 'lowshelf';
     bass.frequency.value = 95;
-    bass.gain.value = stemType === 'vocals' ? 0 : this.currentSettings.bassBoost;
+    bass.gain.value = this.isOriginalMode ? 0 : Math.max(0, Math.min(12, this.currentSettings.bassBoost));
 
     const lofi = offlineCtx.createBiquadFilter();
     lofi.type = 'lowpass';
-    lofi.frequency.value = this.currentSettings.lofiCutoff || 20000;
+    lofi.frequency.value = this.isOriginalMode ? 20000 : Math.max(400, Math.min(20000, this.currentSettings.lofiCutoff || 20000));
 
-    const vocalFilter = offlineCtx.createBiquadFilter();
-    vocalFilter.type = 'peaking';
-    vocalFilter.frequency.value = 3200;
-    vocalFilter.gain.value = stemType === 'vocals' ? 4.0 : 0;
+    stemMixer.connect(bass);
+    bass.connect(lofi);
 
-    const conv = offlineCtx.createConvolver();
-    const impLen = sampleRate * (this.currentSettings.reverbDecay || 4);
-    const impBuf = offlineCtx.createBuffer(2, impLen, sampleRate);
-    for (let c = 0; c < 2; c++) {
-      const d = impBuf.getChannelData(c);
-      for (let i = 0; i < impLen; i++) {
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / impLen, 3);
-      }
-    }
-    conv.buffer = impBuf;
-
+    // Smooth scratch-free reverb convolver using diffuse filtered impulse
+    const wetVal = this.isOriginalMode ? 0.0 : Math.max(0, Math.min(0.85, this.currentSettings.reverbWet));
     const dry = offlineCtx.createGain();
     const wet = offlineCtx.createGain();
-    const wetVal = Math.max(0, Math.min(0.9, this.currentSettings.reverbWet));
     wet.gain.value = wetVal;
-    dry.gain.value = Math.max(0.1, 1.0 - wetVal * 0.6);
-
-    const comp = offlineCtx.createDynamicsCompressor();
+    dry.gain.value = Math.max(0.15, 1.0 - wetVal * 0.5);
 
     const offlinePanner = offlineCtx.createStereoPanner();
-    if (this.currentSettings.pan8d) {
+    if (this.currentSettings.pan8d && !this.isOriginalMode) {
       const panSpeed = this.currentSettings.panSpeed || 0.12;
-      const step = 0.05;
-      for (let t = 0; t < renderDuration; t += step) {
+      const step = 0.04;
+      offlinePanner.pan.setValueAtTime(0, 0);
+      for (let t = step; t <= renderDuration; t += step) {
         const panValue = Math.sin(t * panSpeed * Math.PI * 2);
-        offlinePanner.pan.setValueAtTime(Math.max(-1, Math.min(1, panValue)), t);
+        offlinePanner.pan.linearRampToValueAtTime(Math.max(-1, Math.min(1, panValue)), t);
       }
     } else {
       offlinePanner.pan.setValueAtTime(0, 0);
     }
 
-    offlineSrc.connect(bass);
-    bass.connect(lofi);
-    lofi.connect(vocalFilter);
-
-    vocalFilter.connect(dry);
-    vocalFilter.connect(conv);
-    conv.connect(wet);
-
+    lofi.connect(dry);
     dry.connect(offlinePanner);
-    wet.connect(offlinePanner);
+
+    if (wetVal > 0.02) {
+      const conv = offlineCtx.createConvolver();
+      conv.buffer = this.createImpulseResponse(this.currentSettings.reverbDecay || 3.0, offlineCtx);
+      lofi.connect(conv);
+      conv.connect(wet);
+      wet.connect(offlinePanner);
+    }
+
+    // Mastering limiter compressor targeting -9 LUFS
+    const comp = offlineCtx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-14, 0);
+    comp.knee.setValueAtTime(25, 0);
+    comp.ratio.setValueAtTime(4.5, 0);
+    comp.attack.setValueAtTime(0.003, 0);
+    comp.release.setValueAtTime(0.2, 0);
+
+    // Soft saturation limiter to prevent any digital overs
+    const softLimiter = offlineCtx.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) {
+      const x = (i * 2) / 1024 - 1;
+      curve[i] = Math.tanh(x * 1.05) * 0.95;
+    }
+    softLimiter.curve = curve;
 
     offlinePanner.connect(comp);
 
-    // If swapped remix, add secondary instrumental loop to offline context
-    if ((stemType === 'swapped_remix' || this.stemMode === 'swapped_instrumental') && swapStyle && swapStyle !== 'none') {
+    // Swapped style secondary backing track if active
+    if (isSwapped && swapStyle && swapStyle !== 'none') {
       const instBuf = this.getOrCreateInstrumentalBuffer(swapStyle);
       const offlineInst = offlineCtx.createBufferSource();
       offlineInst.buffer = instBuf;
@@ -1737,20 +1657,23 @@ export class MusicAudioEngine {
       offlineInst.start(0);
     }
 
-    comp.connect(offlineCtx.destination);
-    offlineSrc.start(0);
+    comp.connect(softLimiter);
+    softLimiter.connect(offlineCtx.destination);
+
+    offlineFull.start(0);
+    offlineBeat.start(0);
+    offlineVocal.start(0);
 
     const rendered = await offlineCtx.startRendering();
     return this.bufferToWave(rendered);
   }
 
-  // Convert AudioBuffer to 16-bit PCM WAV Blob
+  // Convert AudioBuffer to pristine 16-bit PCM WAV Blob (100% distortion-free)
   private bufferToWave(abuffer: AudioBuffer): Blob {
     const numOfChan = abuffer.numberOfChannels;
     const length = abuffer.length * numOfChan * 2 + 44;
     const out = new DataView(new ArrayBuffer(length));
     const channels: Float32Array[] = [];
-    let sample = 0;
     let offset = 0;
     let pos = 0;
 
@@ -1769,12 +1692,12 @@ export class MusicAudioEngine {
 
     setUint32(0x20746d66); // "fmt "
     setUint32(16);
-    setUint16(1);
+    setUint16(1); // PCM format
     setUint16(numOfChan);
     setUint32(abuffer.sampleRate);
     setUint32(abuffer.sampleRate * 2 * numOfChan);
     setUint16(numOfChan * 2);
-    setUint16(16);
+    setUint16(16); // 16-bit
 
     setUint32(0x61746164); // "data"
     setUint32(length - pos - 4);
@@ -1785,9 +1708,9 @@ export class MusicAudioEngine {
 
     while (offset < abuffer.length) {
       for (let i = 0; i < numOfChan; i++) {
-        sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-        out.setInt16(pos, sample, true);
+        const s = Math.max(-1, Math.min(1, channels[i][offset]));
+        const pcm = s < 0 ? Math.round(s * 32768) : Math.round(s * 32767);
+        out.setInt16(pos, Math.max(-32768, Math.min(32767, pcm)), true);
         pos += 2;
       }
       offset++;

@@ -11,10 +11,11 @@ import {
   Mic2,
   ArrowRightLeft,
   Zap,
-  Film
+  Film,
+  Layers
 } from 'lucide-react';
 
-export type NavTab = 'vizmotion' | 'dashboard' | 'studio' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
+export type NavTab = 'vizmotion' | 'dashboard' | 'studio' | 'dualsync' | 'vibe' | 'visuals' | 'trends' | 'rights' | 'publish';
 
 interface NavigationDockProps {
   activeTab: NavTab;
@@ -37,6 +38,7 @@ export const NavigationDock: React.FC<NavigationDockProps> = ({
     { id: 'vizmotion', label: 'VIZMOTION AI Video Editor', icon: Film },
     { id: 'dashboard', label: 'Console', icon: Home },
     { id: 'studio', label: 'Studio Engine & Remix', icon: Sliders },
+    { id: 'dualsync', label: '2-Song Beat Sync & Compress', icon: Layers },
     { id: 'vibe', label: 'Make It A Vibe', icon: Sparkles },
     { id: 'visuals', label: 'Audio Visualizer Studio', icon: Video },
     { id: 'trends', label: 'Trend Discovery', icon: TrendingUp },

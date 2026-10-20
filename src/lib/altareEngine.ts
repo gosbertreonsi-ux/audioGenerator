@@ -101,6 +101,18 @@ export const ALTARE_KEY_NOTES: Record<string, { root: number; chords: number[][]
   }
 };
 
+// Anti-aliased bandlimited sawtooth wave (silky, rich, zero Nyquist aliasing/scratching)
+function smoothSaw(phase: number): number {
+  const p = (phase % 1) * 2 * Math.PI;
+  return (
+    Math.sin(p) +
+    0.45 * Math.sin(2 * p) +
+    0.22 * Math.sin(3 * p) +
+    0.12 * Math.sin(4 * p) +
+    0.06 * Math.sin(5 * p)
+  ) * 0.58;
+}
+
 export class AltareEngine {
   private static cachedBuffer: AudioBuffer | null = null;
   private static cachedConfigHash: string = '';
@@ -141,18 +153,23 @@ export class AltareEngine {
     const dropEnd = 70.0;
 
     // Reese detune frequency offset (Hz)
-    const reeseDetune = 0.75;
+    const reeseDetune = 0.65;
     const reeseCutoff = config.reeseCutoff;
 
     // Supersaw detuning offsets for 7 voices
     const supersawDetunes = [-0.035, -0.02, -0.008, 0, 0.008, 0.02, 0.035];
+
+    // Filter states for smooth, scratch-free percussions and risers
+    let snareNoiseFilt = 0;
+    let hihatNoiseFilt = 0;
+    let riserNoiseFilt = 0;
+    let tickNoiseFilt = 0;
 
     for (let i = 0; i < len; i++) {
       const t = i / rate;
       const barNum = Math.floor(t / barInterval);
       const chord = chordList[barNum % chordList.length];
       const rootHz = chord[0];
-      const barPhase = (t % barInterval) / barInterval; // 0.0 to 1.0 within bar
       const beatPhase = (t % beatInterval) / beatInterval; // 0.0 to 1.0 within beat
 
       let mixL = 0;
@@ -171,10 +188,10 @@ export class AltareEngine {
           mixR += padR;
         }
 
-        // B. Ethereal Low-Pass Reese Bass (pulsing detuned saws)
+        // B. Ethereal Low-Pass Reese Bass (smooth anti-aliased detuned saws)
         const reeseFreq = rootHz * 0.5; // low octave
-        const saw1 = (2 * ((t * reeseFreq) % 1) - 1);
-        const saw2 = (2 * ((t * (reeseFreq + reeseDetune)) % 1) - 1);
+        const saw1 = smoothSaw(t * reeseFreq);
+        const saw2 = smoothSaw(t * (reeseFreq + reeseDetune));
         const reeseRaw = (saw1 + saw2) * 0.5;
         // Soft low-pass feel
         const reeseEnv = Math.min(1.0, t / 4.0); // smooth fade in
@@ -182,13 +199,15 @@ export class AltareEngine {
         mixL += reeseRaw * reeseGain;
         mixR += reeseRaw * reeseGain;
 
-        // C. Crisp Metallic Clock-Tick Percussion (on every quarter beat)
+        // C. Crisp Metallic Clock-Tick Percussion (soft filtered transient)
         if (t > 4.0) {
           const tickT = (t % beatInterval);
           if (tickT < 0.025) {
-            const tickImpulse = (Math.random() * 2 - 1) * Math.exp(-tickT * 180);
-            mixL += tickImpulse * 0.08;
-            mixR += tickImpulse * 0.06;
+            const rawTick = (Math.random() * 2 - 1);
+            tickNoiseFilt += 0.25 * (rawTick - tickNoiseFilt); // filter out harsh scratch
+            const tickImpulse = tickNoiseFilt * Math.exp(-tickT * 180);
+            mixL += tickImpulse * 0.06;
+            mixR += tickImpulse * 0.05;
           }
         }
       }
@@ -209,11 +228,6 @@ export class AltareEngine {
         }
 
         // B. Escalating Snare Roll Acceleration:
-        // 0:30 - 0:36: 1/4 notes
-        // 0:36 - 0:41: 1/8 notes
-        // 0:41 - 0:44: 1/16 notes
-        // 0:44 - 0:44.75: 1/32 notes
-        // 0:44.75 - 0:45: Pre-drop silent gap!
         if (t < buildEnd - 0.25) {
           let subdiv = 1; // quarter notes
           if (t >= 44.0) subdiv = 8; // 32nd notes
@@ -224,20 +238,23 @@ export class AltareEngine {
           const snareT = t % subBeatInterval;
           if (snareT < 0.08) {
             const snareTone = Math.sin(2 * Math.PI * 195 * snareT) * Math.exp(-snareT * 40);
-            const snareNoise = (Math.random() * 2 - 1) * Math.exp(-snareT * 35);
+            const rawSnareNoise = (Math.random() * 2 - 1);
+            snareNoiseFilt += 0.2 * (rawSnareNoise - snareNoiseFilt); // smooth body without scratch
             const snareAmp = (0.08 + buildProgress * 0.24);
-            const snareHit = (snareTone * 0.4 + snareNoise * 0.6) * snareAmp;
+            const snareHit = (snareTone * 0.45 + snareNoiseFilt * 0.55 * Math.exp(-snareT * 35)) * snareAmp;
             mixL += snareHit;
             mixR += snareHit;
           }
         }
 
-        // C. White Noise Pitch Riser Sweep
-        const riserFreq = 200 + Math.pow(buildProgress, 2) * 8000;
-        const riserNoise = (Math.random() * 2 - 1) * Math.sin(2 * Math.PI * riserFreq * t);
-        const riserAmp = buildProgress * 0.12;
-        mixL += riserNoise * riserAmp;
-        mixR += riserNoise * riserAmp * 1.1;
+        // C. Smooth Noise Pitch Riser Sweep (bandlimited)
+        const riserFreq = 200 + Math.pow(buildProgress, 2) * 6000;
+        const rawRiser = (Math.random() * 2 - 1);
+        riserNoiseFilt += 0.18 * (rawRiser - riserNoiseFilt);
+        const riserTone = Math.sin(2 * Math.PI * riserFreq * t);
+        const riserSound = (riserNoiseFilt * 0.5 + riserTone * 0.5) * (buildProgress * 0.11);
+        mixL += riserSound;
+        mixR += riserSound * 1.05;
       }
 
       // ============================================================
@@ -248,30 +265,27 @@ export class AltareEngine {
         const beatInBar = (dropT / beatInterval) % 4; // 0, 1, 2, 3
 
         // A. Sidechain Pumping Envelope (Ducks every beat for Future Bass drop)
-        // Duck curve: drops sharply to 0.12 when kick hits, rapidly rises back to 1.0
         const kickDist = beatPhase; // 0 at kick, 1 before next
         const sidechainDuck = 1.0 - config.sidechainDepth * Math.exp(-kickDist * 6.5);
 
-        // B. Aggressive Detuned Supersaws (7 unison voices per chord note)
+        // B. Aggressive Detuned Supersaws (Smooth anti-aliased voices - NO scratching)
         let supersawTotalL = 0;
         let supersawTotalR = 0;
         for (let c = 0; c < chord.length; c++) {
           const baseFreq = chord[c];
           for (let v = 0; v < supersawDetunes.length; v++) {
             const detunedFreq = baseFreq * (1.0 + supersawDetunes[v]);
-            const sawSample = (2 * ((t * detunedFreq) % 1) - 1);
-            // Alternate pan
+            const sawSample = smoothSaw(t * detunedFreq);
             if (v % 2 === 0) supersawTotalL += sawSample;
             else supersawTotalR += sawSample;
           }
         }
         const supersawNorm = (supersawTotalL + supersawTotalR) / (chord.length * supersawDetunes.length);
         const supersawOut = supersawNorm * (0.28 + config.energy * 0.16) * sidechainDuck;
-        mixL += supersawOut * 1.1;
+        mixL += supersawOut * 1.05;
         mixR += supersawOut * 0.95;
 
         // C. Heavy Clean 808 Sub-Bass Kick Combo
-        // Kick on beats 0, 1.5, 2.5, 3 (Syncopated Hybrid Trap pattern)
         const isTrapKick = (beatInBar < 0.22) || 
                            (beatInBar > 1.45 && beatInBar < 1.68) || 
                            (beatInBar > 2.45 && beatInBar < 2.68);
@@ -295,20 +309,24 @@ export class AltareEngine {
         if ((beatInBar > 1.95 && beatInBar < 2.15) || (beatInBar > 3.95 && beatInBar < 4.15)) {
           const snareSubT = (t % beatInterval);
           if (snareSubT < 0.15) {
-            const sTone = Math.sin(2 * Math.PI * 220 * snareSubT) * Math.exp(-snareSubT * 30);
-            const sSnap = (Math.random() * 2 - 1) * Math.exp(-snareSubT * 45);
-            const snareFinal = (sTone * 0.4 + sSnap * 0.6) * 0.32;
+            const sTone = Math.sin(2 * Math.PI * 210 * snareSubT) * Math.exp(-snareSubT * 30);
+            const rawNoise = (Math.random() * 2 - 1);
+            snareNoiseFilt += 0.22 * (rawNoise - snareNoiseFilt); // smooth body, no static
+            const sSnap = snareNoiseFilt * Math.exp(-snareSubT * 45);
+            const snareFinal = (sTone * 0.45 + sSnap * 0.55) * 0.30;
             mixL += snareFinal;
             mixR += snareFinal;
           }
         }
 
-        // E. Rolling Trap Hi-Hats (16th notes with stereo tick)
+        // E. Rolling Trap Hi-Hats (16th notes with smooth filtered tick)
         const hihatT = (t % (beatInterval / 4));
         if (hihatT < 0.035) {
-          const hatNoise = (Math.random() * 2 - 1) * Math.exp(-hihatT * 95) * 0.045;
+          const rawHat = (Math.random() * 2 - 1);
+          hihatNoiseFilt += 0.3 * (rawHat - hihatNoiseFilt);
+          const hatNoise = hihatNoiseFilt * Math.exp(-hihatT * 95) * 0.04;
           mixL += hatNoise;
-          mixR += hatNoise * 1.2;
+          mixR += hatNoise * 1.1;
         }
       }
 
@@ -339,7 +357,7 @@ export class AltareEngine {
   /**
    * Generates a Melodic Vocal Chop Loop from user's isolated vocal buffer
    * Slices vowel anchors, dynamically pitches & time-quantizes them into the
-   * signature Altare future bass melodic lead!
+   * signature Altare future bass melodic lead with linear interpolation (no scratching)!
    */
   public static generateVocalChopLead(
     ctx: BaseAudioContext,
@@ -416,13 +434,19 @@ export class AltareEngine {
         const outIdx = outStartSample + s;
         if (outIdx >= len) break;
 
-        const srcIdx = Math.floor(srcStart + s * notePitchRatio);
-        if (srcIdx >= inLen) break;
+        const exactSrc = srcStart + s * notePitchRatio;
+        const srcIdx0 = Math.floor(exactSrc);
+        if (srcIdx0 >= inLen - 1) break;
+        const frac = exactSrc - srcIdx0;
 
-        // Envelope (smooth attack, fast release)
-        const env = Math.min(1.0, s / 180) * Math.pow(1.0 - (s / sliceSamples), 1.5);
-        const sampleL = inL[srcIdx] * env * 1.15;
-        const sampleR = inR[srcIdx] * env * 1.15;
+        // Smooth linear interpolation eliminates quantization scratching
+        const sampleInL = inL[srcIdx0] + frac * (inL[srcIdx0 + 1] - inL[srcIdx0]);
+        const sampleInR = inR[srcIdx0] + frac * (inR[srcIdx0 + 1] - inR[srcIdx0]);
+
+        // Smooth envelope (gentle attack, smooth cubic release)
+        const env = Math.min(1.0, s / 150) * Math.pow(1.0 - (s / sliceSamples), 1.5);
+        const sampleL = sampleInL * env * 1.1;
+        const sampleR = sampleInR * env * 1.1;
 
         // Add with stereo ping-pong delay feel
         outL[outIdx] = Math.max(-0.95, Math.min(0.95, outL[outIdx] + sampleL));
