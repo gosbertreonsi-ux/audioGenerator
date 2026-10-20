@@ -102,7 +102,8 @@ export const AudioVisualizerCanvas: React.FC<AudioVisualizerCanvasProps> = ({
 
     // Safe offscreen background buffer with CORS taint isolation
     let offscreenBg: HTMLCanvasElement | null = null;
-    if (bgImageSrc) {
+    const validBgSrc = (typeof bgImageSrc === 'string' && bgImageSrc.trim() !== '') ? bgImageSrc.trim() : null;
+    if (validBgSrc) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -128,12 +129,13 @@ export const AudioVisualizerCanvas: React.FC<AudioVisualizerCanvasProps> = ({
       img.onerror = () => {
         offscreenBg = null;
       };
-      img.src = bgImageSrc;
+      img.src = validBgSrc;
     }
 
     // Safe offscreen central cover buffer
     let offscreenCover: HTMLCanvasElement | null = null;
-    const coverToLoad = coverUrl || bgImageSrc;
+    const rawCover = (typeof coverUrl === 'string' && coverUrl.trim() !== '') ? coverUrl.trim() : validBgSrc;
+    const coverToLoad = rawCover || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80';
     if (coverToLoad) {
       const cImg = new Image();
       cImg.crossOrigin = 'anonymous';

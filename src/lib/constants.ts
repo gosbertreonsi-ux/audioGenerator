@@ -102,7 +102,7 @@ export const DEFAULT_UNLOADED_TRACK: AudioTrack = {
   vocals: 'Instrumental Only',
   lufs: -14,
   genre: 'Imported Audio',
-  coverUrl: '',
+  coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
   sourceType: 'user_upload',
 };
 

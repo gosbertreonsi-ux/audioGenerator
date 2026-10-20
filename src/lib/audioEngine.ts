@@ -31,6 +31,19 @@ export class MusicAudioEngine {
   private instrumentalGainNode: GainNode | null = null;
   private instrumentalBufferMap: Map<string, AudioBuffer> = new Map();
 
+  // Dual-Track In-Studio Layering (Song 2)
+  private secondaryBuffer: AudioBuffer | null = null;
+  private secondaryTrackTitle: string = '';
+  private secondaryVocalBuffer: AudioBuffer | null = null;
+  private secondaryBeatBuffer: AudioBuffer | null = null;
+  private secondarySourceNode: AudioBufferSourceNode | null = null;
+  private secondaryGainNode: GainNode | null = null;
+  private secondaryVolume: number = 0.85;
+  private secondaryStemMode: 'full' | 'beat_only' | 'words_only' = 'full';
+  private secondaryNativeBpm: number = 120;
+  private secondaryBeatLock: boolean = true;
+  private secondaryOffsetSec: number = 0;
+
   // Additional FX Nodes
   private bassFilter: BiquadFilterNode | null = null;
   private lofiFilter: BiquadFilterNode | null = null;
@@ -818,6 +831,162 @@ export class MusicAudioEngine {
     this.notify();
   }
 
+  /**
+   * Fast, accurate BPM detection using autocorrelation of low-pass filtered transients
+   */
+  public detectBpm(buffer: AudioBuffer | null): number {
+    if (!buffer) return 120;
+    const sampleRate = buffer.sampleRate;
+    const channelData = buffer.getChannelData(0);
+    const maxScanSeconds = Math.min(60, buffer.duration);
+    const totalSamples = Math.floor(sampleRate * maxScanSeconds);
+
+    const downsample = 4;
+    const downsampledRate = sampleRate / downsample;
+    const len = Math.floor(totalSamples / downsample);
+    const env = new Float32Array(len);
+
+    let lp = 0;
+    const alpha = (220 / sampleRate) * 2 * Math.PI;
+
+    for (let i = 0, j = 0; i < totalSamples && j < len; i += downsample, j++) {
+      const raw = channelData[i];
+      lp += alpha * (raw - lp);
+      env[j] = lp * lp;
+    }
+
+    const minBpm = 75;
+    const maxBpm = 175;
+    const minLag = Math.floor((downsampledRate * 60) / maxBpm);
+    const maxLag = Math.floor((downsampledRate * 60) / minBpm);
+
+    let bestBpm = 120;
+    let maxCorr = -1;
+
+    for (let lag = minLag; lag <= maxLag; lag += 2) {
+      let sum = 0;
+      const count = Math.min(len - lag, Math.floor(downsampledRate * 12));
+      for (let i = 0; i < count; i += 4) {
+        sum += env[i] * env[i + lag];
+      }
+      if (sum > maxCorr) {
+        maxCorr = sum;
+        bestBpm = Math.round((downsampledRate * 60) / lag);
+      }
+    }
+
+    if (bestBpm < 75) bestBpm *= 2;
+    if (bestBpm > 175) bestBpm = Math.round(bestBpm / 2);
+
+    return Math.max(80, Math.min(160, bestBpm));
+  }
+
+  // --- SECONDARY AUDIO TRACK (SONG 2) LAYER METHODS ---
+  public async loadSecondaryAudioFile(file: File): Promise<AudioBuffer> {
+    this.initContext();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await this.ctx!.decodeAudioData(arrayBuffer);
+    this.secondaryBuffer = decoded;
+    this.secondaryTrackTitle = file.name.replace(/\.[^/.]+$/, '');
+    this.secondaryNativeBpm = this.detectBpm(decoded);
+    const stems = this.separateStemsFromBuffer(decoded);
+    this.secondaryVocalBuffer = stems.vocal;
+    this.secondaryBeatBuffer = stems.instrumental;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+    return decoded;
+  }
+
+  public async loadSecondaryAudioBuffer(buffer: AudioBuffer, title?: string): Promise<AudioBuffer> {
+    this.initContext();
+    this.secondaryBuffer = buffer;
+    this.secondaryTrackTitle = title || 'Song 2 (Layer)';
+    this.secondaryNativeBpm = this.detectBpm(buffer);
+    const stems = this.separateStemsFromBuffer(buffer);
+    this.secondaryVocalBuffer = stems.vocal;
+    this.secondaryBeatBuffer = stems.instrumental;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+    return buffer;
+  }
+
+  public removeSecondaryTrack() {
+    try { this.secondarySourceNode?.stop(); } catch { /* ignore */ }
+    this.secondarySourceNode?.disconnect();
+    this.secondaryBuffer = null;
+    this.secondaryVocalBuffer = null;
+    this.secondaryBeatBuffer = null;
+    this.secondaryTrackTitle = '';
+    this.notify();
+  }
+
+  public hasSecondaryTrack(): boolean {
+    return Boolean(this.secondaryBuffer);
+  }
+
+  public getSecondaryTrackInfo() {
+    return {
+      hasTrack: Boolean(this.secondaryBuffer),
+      title: this.secondaryTrackTitle,
+      bpm: this.secondaryNativeBpm,
+      volume: this.secondaryVolume,
+      stemMode: this.secondaryStemMode,
+      beatLock: this.secondaryBeatLock,
+      offsetSec: this.secondaryOffsetSec,
+    };
+  }
+
+  public setSecondaryVolume(vol: number) {
+    this.secondaryVolume = Math.max(0, Math.min(1.5, vol));
+    if (this.secondaryGainNode && this.ctx) {
+      this.secondaryGainNode.gain.setTargetAtTime(this.secondaryVolume, this.ctx.currentTime, 0.03);
+    }
+    this.notify();
+  }
+
+  public setSecondaryStemMode(mode: 'full' | 'beat_only' | 'words_only') {
+    this.secondaryStemMode = mode;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+  }
+
+  public setSecondaryBeatLock(lock: boolean) {
+    this.secondaryBeatLock = lock;
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+  }
+
+  public setSecondaryOffset(sec: number) {
+    this.secondaryOffsetSec = Math.max(-10, Math.min(10, sec));
+    if (this.isPlaying) {
+      const cur = this.getCurrentTime();
+      this.pause();
+      this.pauseOffset = cur * (this.isOriginalMode ? 1.0 : this.currentSettings.speed);
+      this.play();
+    }
+    this.notify();
+  }
+
   // Create algorithmic studio impulse response for Reverb (100% scratch-free, diffuse acoustic space, smooth multi-tap reflections)
   private createImpulseResponse(decayTime: number, baseCtx?: BaseAudioContext): AudioBuffer {
     const ctx = baseCtx || this.ctx!;
@@ -897,6 +1066,10 @@ export class MusicAudioEngine {
       try { this.instrumentalSourceNode.stop(); } catch { /* ignore */ }
       this.instrumentalSourceNode.disconnect();
     }
+    if (this.secondarySourceNode) {
+      try { this.secondarySourceNode.stop(); } catch { /* ignore */ }
+      this.secondarySourceNode.disconnect();
+    }
 
     // Ensure pre-separated stem buffers exist
     if (!this.instrumentalBuffer || !this.vocalBuffer) {
@@ -941,6 +1114,31 @@ export class MusicAudioEngine {
     this.fullGain.connect(stemMixer);
     this.beatGain.connect(stemMixer);
     this.vocalGain.connect(stemMixer);
+
+    // Secondary Audio Track (Song 2) connected to stemMixer for Dual-Audio playback
+    if (this.secondaryBuffer) {
+      const secBuf = this.secondaryStemMode === 'beat_only' && this.secondaryBeatBuffer
+        ? this.secondaryBeatBuffer
+        : this.secondaryStemMode === 'words_only' && this.secondaryVocalBuffer
+        ? this.secondaryVocalBuffer
+        : this.secondaryBuffer;
+
+      this.secondarySourceNode = ctx.createBufferSource();
+      this.secondarySourceNode.buffer = secBuf;
+      this.secondarySourceNode.loop = true;
+
+      const primaryBpm = this.detectBpm(this.currentBuffer);
+      const secMultiplier = (this.secondaryBeatLock && this.secondaryNativeBpm > 0 && primaryBpm > 0)
+        ? (primaryBpm / this.secondaryNativeBpm)
+        : 1.0;
+      this.secondarySourceNode.playbackRate.value = Math.max(0.3, Math.min(2.5, effectiveSpeed * secMultiplier));
+
+      this.secondaryGainNode = ctx.createGain();
+      this.secondaryGainNode.gain.value = this.secondaryVolume;
+
+      this.secondarySourceNode.connect(this.secondaryGainNode);
+      this.secondaryGainNode.connect(stemMixer);
+    }
 
     // 6. User Bass Boost Filter (Low Shelf at 95Hz)
     this.bassFilter = ctx.createBiquadFilter();
@@ -1149,6 +1347,10 @@ export class MusicAudioEngine {
       const instOffset = instBuffer ? (this.pauseOffset % instBuffer.duration) : 0;
       try { this.instrumentalSourceNode.start(0, instOffset); } catch (e) { /* ignore */ }
     }
+    if (this.secondarySourceNode && this.secondaryBuffer) {
+      const secOffset = Math.max(0, (offset + this.secondaryOffsetSec) % this.secondaryBuffer.duration);
+      try { this.secondarySourceNode.start(0, secOffset); } catch (e) { /* ignore */ }
+    }
 
     this.startTime = this.ctx!.currentTime - (offset / (this.isOriginalMode ? 1.0 : this.currentSettings.speed));
     this.isPlaying = true;
@@ -1171,6 +1373,7 @@ export class MusicAudioEngine {
     try { this.altareSourceNode?.stop(); } catch { /* ignore */ }
     try { this.vocalChopSourceNode?.stop(); } catch { /* ignore */ }
     try { this.instrumentalSourceNode?.stop(); } catch { /* ignore */ }
+    try { this.secondarySourceNode?.stop(); } catch { /* ignore */ }
 
     this.isPlaying = false;
     if (this.timeUpdateTimer) clearInterval(this.timeUpdateTimer);

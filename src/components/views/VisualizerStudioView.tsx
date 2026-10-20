@@ -536,7 +536,7 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
                       vocals: 'Detected',
                       lufs: -10,
                       genre: 'User Track',
-                      coverUrl: '',
+                      coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
                       sourceType: 'user_upload',
                     };
                     setCurrentTrack(newT);
@@ -941,7 +941,11 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
                           : 'bg-[#1f0a0d] border-[#371518] text-[#a67c7f] hover:text-white'
                       }`}
                     >
-                      <img src={bg.url} alt={bg.name} className="w-8 h-8 rounded-lg object-cover" />
+                      {bg.url ? (
+                        <img src={bg.url} alt={bg.name} className="w-8 h-8 rounded-lg object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-[#2a0d10]" />
+                      )}
                       <div className="text-[11px] font-bold truncate leading-tight">{bg.name}</div>
                     </button>
                   ))}
