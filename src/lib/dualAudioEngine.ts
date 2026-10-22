@@ -89,6 +89,7 @@ export class DualAudioEngine {
 
   private sidechainGainB: GainNode | null = null;
   private sidechainGainA: GainNode | null = null;
+  private sidechainOsc: OscillatorNode | null = null;
 
   private glueCompressor: DynamicsCompressorNode | null = null;
   private softLimiter: WaveShaperNode | null = null;
@@ -475,6 +476,225 @@ export class DualAudioEngine {
     return { trackA: tA, trackB: tB };
   }
 
+  /**
+   * Applies the signature "Ariana - bye (Altare Remix / Flip)" production aesthetic:
+   * - 145 BPM Future Bass / Hybrid Trap quantization
+   * - Track A: isolated vocals stem ('words_only') with slight stereo dimension
+   * - Track B: punchy instrumental / trap drop ('beat_only') with deep 808 subs & supersaws
+   * - Heavy sidechain ducking (depth 0.88)
+   * - Tight transient punch boost (+6.5 dB)
+   * - Bus glue compressor (-18 dB threshold, 4.5 ratio, 3ms attack)
+   * - Brickwall saturation limiter target -9 LUFS
+   */
+  public applyAltareArianaByePreset() {
+    this.config.targetBpm = 145;
+    this.config.targetBeatFrequencyHz = Number((145 / 60).toFixed(3));
+    this.config.syncMode = 'custom';
+    this.config.sidechainSource = 'b_ducks_a'; // Kick & 808 drops aggressively duck the vocal stem
+    this.config.sidechainDepth = 0.88;
+    this.config.glueThreshold = -18;
+    this.config.glueRatio = 4.5;
+    this.config.glueAttack = 0.003;
+    this.config.glueRelease = 0.18;
+    this.config.beatPunchBoost = 6.5;
+    this.config.crossfader = 0.5;
+
+    if (this.trackA) {
+      this.trackA.stemMode = 'words_only'; // Ariana vocals
+      this.trackA.volume = 1.15;
+      this.trackA.pan = -0.15;
+    }
+    if (this.trackB) {
+      this.trackB.stemMode = 'beat_only'; // Altare drop / beat
+      this.trackB.volume = 1.1;
+      this.trackB.pan = 0.15;
+    }
+
+    if (this.isPlaying) {
+      this.restartPlaybackAtOffset(this.getCurrentTime());
+    } else {
+      this.notify();
+    }
+  }
+
+  /**
+   * Generates and loads the iconic "Ariana Grande - bye (Altare Remix / Flip)":
+   * - Track A: "Ariana Grande - bye (Isolated Acapella Vocals)" @ 116 BPM with harmonic formant vocal runs & vibrato
+   * - Track B: "Altare - Future Bass & Wave Drop" @ 145 BPM with heavy gliding 808s, pumping supersaws & trap claps
+   * - Automatically applies 145 BPM tempo lock, isolated words mode, sidechain ducking, glue compression, and plays both simultaneously for preview!
+   */
+  public async loadArianaAltareByeDemoPair(): Promise<{ trackA: DualTrackItem; trackB: DualTrackItem }> {
+    const ctx = this.initContext();
+    const sampleRate = ctx.sampleRate;
+
+    // --- Song A: "Ariana Grande - bye (Isolated Acapella Vocals)" - 116 BPM ---
+    const bpmA = 116;
+    const beatSecA = 60 / bpmA;
+    const durA = beatSecA * 32; // ~16.55s
+    const lenA = Math.floor(sampleRate * durA);
+    const bufA = ctx.createBuffer(2, lenA, sampleRate);
+    const aL = bufA.getChannelData(0);
+    const aR = bufA.getChannelData(1);
+
+    // Ariana "bye" notes: Fm scale (F3=174.61, Ab3=207.65, Bb3=233.08, C4=261.63, Eb4=311.13, F4=349.23, G4=392.0)
+    for (let i = 0; i < lenA; i++) {
+      const t = i / sampleRate;
+      const beat = (t / beatSecA) % 32;
+      const phrase = Math.floor(beat / 4); // 0 to 7
+      const beatInPhrase = beat % 4;
+
+      let targetPitch = 261.63; // C4 default
+      let isSinging = false;
+      let vibratoDepth = 0.025;
+
+      if (phrase % 2 === 0) {
+        // "bye..." (0 - 1.6s)
+        if (beatInPhrase < 1.6) {
+          isSinging = true;
+          const pT = beatInPhrase / 1.6;
+          targetPitch = 261.63 + (311.13 - 261.63) * Math.min(1, pT * 2.5); // slides C4 -> Eb4
+        } else if (beatInPhrase >= 2.0 && beatInPhrase < 3.6) {
+          // "bye..." (second bye)
+          isSinging = true;
+          const pT = (beatInPhrase - 2.0) / 1.6;
+          targetPitch = 311.13 - (311.13 - 261.63) * Math.min(1, pT * 2); // slides Eb4 -> C4
+        }
+      } else {
+        // "boy, bye... yeah..." (melodic run)
+        if (beatInPhrase < 1.2) {
+          isSinging = true;
+          targetPitch = 349.23; // F4 ("boy")
+        } else if (beatInPhrase >= 1.2 && beatInPhrase < 2.4) {
+          isSinging = true;
+          targetPitch = 311.13; // Eb4 ("bye")
+        } else if (beatInPhrase >= 2.6 && beatInPhrase < 3.8) {
+          isSinging = true;
+          targetPitch = 261.63; // C4 ("yeah...")
+          vibratoDepth = 0.04;
+        }
+      }
+
+      let vocalSampleL = 0;
+      let vocalSampleR = 0;
+
+      if (isSinging) {
+        const vibrato = 1 + Math.sin(2 * Math.PI * 5.6 * t) * vibratoDepth;
+        const currentFreq = targetPitch * vibrato;
+
+        // Multi-formant additive female vocal synthesis
+        const f0 = Math.sin(2 * Math.PI * currentFreq * t);
+        const f1 = Math.sin(2 * Math.PI * currentFreq * 2 * t) * 0.45;
+        const f2 = Math.sin(2 * Math.PI * currentFreq * 3 * t) * 0.28;
+        const f3 = Math.sin(2 * Math.PI * currentFreq * 4 * t) * 0.15;
+        // Warm 3rd harmony layer (Ariana double-tracking)
+        const harm = Math.sin(2 * Math.PI * (currentFreq * 1.2) * t) * 0.32;
+        // Airy vocal formant resonance
+        const formantAir = Math.sin(2 * Math.PI * 2800 * t) * (f0 * f0) * 0.08;
+
+        const rawVocal = (f0 + f1 + f2 + f3 + harm + formantAir) * 0.42;
+        vocalSampleL = rawVocal;
+        vocalSampleR = (f0 + f1 + f2 + f3 + Math.sin(2 * Math.PI * (currentFreq * 1.2) * t + 0.3) * 0.32) * 0.42;
+      }
+
+      aL[i] = Math.max(-0.95, Math.min(0.95, vocalSampleL));
+      aR[i] = Math.max(-0.95, Math.min(0.95, vocalSampleR));
+    }
+
+    // --- Song B: "Altare - Wave & Hybrid Trap Drop" - 145 BPM ---
+    const bpmB = 145;
+    const beatSecB = 60 / bpmB;
+    const durB = beatSecB * 32; // ~13.24s
+    const lenB = Math.floor(sampleRate * durB);
+    const bufB = ctx.createBuffer(2, lenB, sampleRate);
+    const bL = bufB.getChannelData(0);
+    const bR = bufB.getChannelData(1);
+
+    const chordsFm = [
+      [174.61, 207.65, 261.63, 349.23, 415.30], // Fm (F, Ab, C, F, Ab)
+      [138.59, 174.61, 207.65, 277.18, 349.23], // Db (Db, F, Ab, Db, F)
+      [207.65, 261.63, 311.13, 415.30, 523.25], // Ab (Ab, C, Eb, Ab, C)
+      [155.56, 196.00, 233.08, 311.13, 392.00], // Eb (Eb, G, Bb, Eb, G)
+    ];
+    const subRoots = [43.65, 34.65, 51.91, 38.89]; // F1, Db1, Ab1, Eb1
+
+    for (let i = 0; i < lenB; i++) {
+      const t = i / sampleRate;
+      const beat = (t / beatSecB) % 32;
+      const bar = Math.floor(beat / 4);
+      const beatInBar = beat % 4;
+      const chordIdx = Math.floor(bar / 2) % 4;
+      const chord = chordsFm[chordIdx];
+      const subRoot = subRoots[chordIdx];
+
+      // 1. Sliding saturated 808 Sub Kick
+      let kick808 = 0;
+      const hitDist = Math.min(beatInBar, Math.abs(beatInBar - 2.5));
+      const hitT = hitDist * beatSecB;
+      if (hitT < 0.42) {
+        const pitchGlide = subRoot + 80 * Math.exp(-hitT * 25);
+        const subSine = Math.sin(2 * Math.PI * pitchGlide * hitT);
+        kick808 = Math.tanh(subSine * 2.2) * Math.exp(-hitT * 4.5) * 0.88;
+      }
+
+      // 2. Altare Snappy Half-time Trap Clap on Beat 3
+      let clap = 0;
+      const clapDist = Math.abs(beatInBar - 2);
+      const clapT = clapDist * beatSecB;
+      if (clapT < 0.22) {
+        const noise = (Math.random() * 2 - 1) * Math.exp(-clapT * 18);
+        const snap = Math.sin(2 * Math.PI * 1800 * clapT) * Math.exp(-clapT * 35);
+        clap = (noise * 0.75 + snap * 0.25) * 0.8;
+      }
+
+      // 3. Fast rolling triplet hi-hats
+      let hat = 0;
+      const hatPhase = (beat * 4) % 1;
+      const hatT = (hatPhase * beatSecB) / 4;
+      if (hatT < 0.03) {
+        hat = (Math.random() * 2 - 1) * Math.exp(-hatT * 95) * 0.35;
+      }
+
+      // 4. Detuned Supersaws (Wave / Future Bass Chords)
+      let sawL = 0;
+      let sawR = 0;
+      for (let c = 0; c < chord.length; c++) {
+        const f = chord[c];
+        const s1 = Math.sin(2 * Math.PI * f * t);
+        const s2 = Math.sin(2 * Math.PI * (f * 1.006) * t);
+        const s3 = Math.sin(2 * Math.PI * (f * 0.994) * t);
+        sawL += (s1 + s2) * 0.055;
+        sawR += (s1 + s3) * 0.055;
+      }
+
+      const sidechainDuck = hitT < 0.28 ? Math.min(1, hitT * 5) : 1.0;
+      sawL *= sidechainDuck;
+      sawR *= sidechainDuck;
+
+      const totalL = kick808 + clap + hat + sawL;
+      const totalR = kick808 + clap + hat + sawR;
+
+      bL[i] = Math.max(-0.95, Math.min(0.95, totalL));
+      bR[i] = Math.max(-0.95, Math.min(0.95, totalR));
+    }
+
+    const tA = await this.loadTrackA(bufA, {
+      name: 'Ariana Grande - bye (Isolated Acapella Vocals)',
+      artist: 'Ariana Grande (116 BPM)',
+    });
+    const tB = await this.loadTrackB(bufB, {
+      name: 'Altare - Wave & Hybrid Trap Drop',
+      artist: 'Altare Production (145 BPM)',
+    });
+
+    // Apply the exact Altare Ariana 'bye' remix aesthetic
+    this.applyAltareArianaByePreset();
+
+    // Start playing immediately for simultaneous preview
+    await this.play();
+
+    return { trackA: tA, trackB: tB };
+  }
+
   private recalculateTargetBpm() {
     if (this.config.syncMode === 'match_a' && this.trackA) {
       this.setTargetBpm(this.trackA.nativeBpm);
@@ -667,11 +887,15 @@ export class DualAudioEngine {
       const pannerA = ctx.createStereoPanner();
       pannerA.pan.value = this.trackA.pan;
 
+      this.sidechainGainA = ctx.createGain();
+      this.sidechainGainA.gain.value = 1.0;
+
       this.sourceA.connect(this.compA);
       this.compA.connect(this.punchA);
       this.punchA.connect(this.gainA);
       this.gainA.connect(pannerA);
-      pannerA.connect(busMixer);
+      pannerA.connect(this.sidechainGainA);
+      this.sidechainGainA.connect(busMixer);
     }
 
     // Setup Track B
@@ -707,11 +931,38 @@ export class DualAudioEngine {
       const pannerB = ctx.createStereoPanner();
       pannerB.pan.value = this.trackB.pan;
 
+      this.sidechainGainB = ctx.createGain();
+      this.sidechainGainB.gain.value = 1.0;
+
       this.sourceB.connect(this.compB);
       this.compB.connect(this.punchB);
       this.punchB.connect(this.gainB);
       this.gainB.connect(pannerB);
-      pannerB.connect(busMixer);
+      pannerB.connect(this.sidechainGainB);
+      this.sidechainGainB.connect(busMixer);
+    }
+
+    // Dynamic Altare Sidechain LFO Pumping (Kick / Drop ducks Vocal)
+    try { this.sidechainOsc?.stop(); } catch {}
+    this.sidechainOsc = null;
+
+    if (this.config.sidechainSource !== 'none' && this.config.sidechainDepth > 0) {
+      const beatFreq = targetBpm / 60;
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sawtooth';
+      lfo.frequency.setValueAtTime(beatFreq, ctx.currentTime);
+
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.setValueAtTime(0.5 * this.config.sidechainDepth, ctx.currentTime);
+
+      const targetGainNode = this.config.sidechainSource === 'b_ducks_a' ? this.sidechainGainA : this.sidechainGainB;
+      if (targetGainNode) {
+        targetGainNode.gain.setValueAtTime(1.0 - 0.5 * this.config.sidechainDepth, ctx.currentTime);
+        lfo.connect(lfoGain);
+        lfoGain.connect(targetGainNode.gain);
+        lfo.start(0);
+        this.sidechainOsc = lfo;
+      }
     }
 
     // GLUE BUS COMPRESSOR (Binds the two song beats into one cohesive rhythm)
@@ -790,6 +1041,8 @@ export class DualAudioEngine {
     this.pauseOffset = this.getCurrentTime();
     try { this.sourceA?.stop(); } catch { /* ignore */ }
     try { this.sourceB?.stop(); } catch { /* ignore */ }
+    try { this.sidechainOsc?.stop(); } catch { /* ignore */ }
+    this.sidechainOsc = null;
     this.isPlaying = false;
     if (this.timeUpdateTimer) {
       clearInterval(this.timeUpdateTimer);
@@ -832,7 +1085,10 @@ export class DualAudioEngine {
    * Renders and exports the two songs locked to the exact same beat frequency
    * and processed through the beat compression and glue bus into a 16-bit 44.1kHz WAV.
    */
-  public async renderAndExportDualWAV(): Promise<Blob> {
+  /**
+   * Renders the two locked and beat-compressed songs into a pristine stereo AudioBuffer
+   */
+  public async renderDualBuffer(): Promise<AudioBuffer> {
     if (!this.trackA && !this.trackB) {
       throw new Error('No tracks loaded for dual mashup export');
     }
@@ -852,6 +1108,7 @@ export class DualAudioEngine {
     const busMixer = offlineCtx.createGain();
 
     // Render Track A
+    let sidechainGainA: GainNode | null = null;
     if (this.trackA && this.trackA.buffer) {
       const bufferA = this.trackA.stemMode === 'beat_only' && this.trackA.beatBuffer
         ? this.trackA.beatBuffer
@@ -882,17 +1139,22 @@ export class DualAudioEngine {
       const pannerA = offlineCtx.createStereoPanner();
       pannerA.pan.value = this.trackA.pan;
 
+      sidechainGainA = offlineCtx.createGain();
+      sidechainGainA.gain.value = 1.0;
+
       srcA.connect(compA);
       compA.connect(punchA);
       punchA.connect(gA);
       gA.connect(pannerA);
-      pannerA.connect(busMixer);
+      pannerA.connect(sidechainGainA);
+      sidechainGainA.connect(busMixer);
 
       const offsetSec = Math.max(0, this.trackA.beatOffsetMs / 1000);
       srcA.start(0, offsetSec);
     }
 
     // Render Track B
+    let sidechainGainB: GainNode | null = null;
     if (this.trackB && this.trackB.buffer) {
       const bufferB = this.trackB.stemMode === 'beat_only' && this.trackB.beatBuffer
         ? this.trackB.beatBuffer
@@ -923,14 +1185,37 @@ export class DualAudioEngine {
       const pannerB = offlineCtx.createStereoPanner();
       pannerB.pan.value = this.trackB.pan;
 
+      sidechainGainB = offlineCtx.createGain();
+      sidechainGainB.gain.value = 1.0;
+
       srcB.connect(compB);
       compB.connect(punchB);
       punchB.connect(gB);
       gB.connect(pannerB);
-      pannerB.connect(busMixer);
+      pannerB.connect(sidechainGainB);
+      sidechainGainB.connect(busMixer);
 
       const offsetSec = Math.max(0, this.trackB.beatOffsetMs / 1000);
       srcB.start(0, offsetSec);
+    }
+
+    // Offline Altare Sidechain LFO Modulation
+    if (this.config.sidechainSource !== 'none' && this.config.sidechainDepth > 0) {
+      const beatFreq = targetBpm / 60;
+      const lfo = offlineCtx.createOscillator();
+      lfo.type = 'sawtooth';
+      lfo.frequency.setValueAtTime(beatFreq, 0);
+
+      const lfoGain = offlineCtx.createGain();
+      lfoGain.gain.setValueAtTime(0.5 * this.config.sidechainDepth, 0);
+
+      const targetGainNode = this.config.sidechainSource === 'b_ducks_a' ? sidechainGainA : sidechainGainB;
+      if (targetGainNode) {
+        targetGainNode.gain.setValueAtTime(1.0 - 0.5 * this.config.sidechainDepth, 0);
+        lfo.connect(lfoGain);
+        lfoGain.connect(targetGainNode.gain);
+        lfo.start(0);
+      }
     }
 
     // Offline Glue Compressor
@@ -954,7 +1239,15 @@ export class DualAudioEngine {
     glue.connect(limiter);
     limiter.connect(offlineCtx.destination);
 
-    const rendered = await offlineCtx.startRendering();
+    return await offlineCtx.startRendering();
+  }
+
+  /**
+   * Renders and exports the two songs locked to the exact same beat frequency
+   * and processed through the beat compression and glue bus into a 16-bit 44.1kHz WAV.
+   */
+  public async renderAndExportDualWAV(): Promise<Blob> {
+    const rendered = await this.renderDualBuffer();
     return this.bufferToWave(rendered);
   }
 

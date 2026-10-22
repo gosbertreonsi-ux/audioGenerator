@@ -167,3 +167,66 @@ export interface StemMixLevels {
   bass: number; // 0.0 - 1.5
 }
 
+// ==========================================
+// MIZIZI STUDIO 2.0 PRD TYPES
+// ==========================================
+
+export type MiziziWorkspaceMode = 'utilities' | 'creative';
+
+export type UtilityCategory = 'video' | 'audio' | 'pdf' | 'image' | 'converter' | 'queue';
+
+export interface UtilityToolDefinition {
+  id: string;
+  name: string;
+  nameSwahili?: string;
+  category: UtilityCategory;
+  description: string;
+  icon: string;
+  badge?: string;
+  supportedInputTypes: string[];
+  outputFormat: string;
+}
+
+export interface LyricLine {
+  id: string;
+  text: string;
+  startTime: number; // in seconds
+  endTime: number; // in seconds
+  isRecorded?: boolean;
+}
+
+export interface LyricVideoConfig {
+  fontFamily: 'Space Grotesk' | 'Plus Jakarta Sans' | 'Impact' | 'Serif' | 'Monospace';
+  fontSize: number; // 18 - 64
+  textColor: string;
+  highlightColor: string;
+  textAlign: 'center' | 'left' | 'right';
+  positionY: number; // 20 - 85 percentage
+  animationStyle: 'fade' | 'karaoke_glow' | 'bounce' | 'slide_up';
+  aspectRatio: '9:16' | '16:9' | '1:1';
+  backgroundType: 'video' | 'image' | 'preset_motion';
+  backgroundUrl: string;
+  backgroundDim: number; // 0 - 0.9
+  backgroundBlur: number; // 0 - 20
+  uppercase: boolean;
+}
+
+export interface MiziziPersistentJob {
+  id: string;
+  name: string;
+  category: UtilityCategory;
+  toolName: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  progress: number;
+  inputFileName: string;
+  outputFileName?: string;
+  outputBlobUrl?: string;
+  outputBlob?: Blob;
+  outputMimeType?: string;
+  fileSizeStr?: string;
+  durationSec?: number;
+  createdAt: number;
+  completedAt?: number;
+}
+
+

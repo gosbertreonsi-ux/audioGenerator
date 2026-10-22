@@ -32,7 +32,7 @@ export const CollaboratorsRail: React.FC<CollaboratorsRailProps> = ({
           >
             <div className="relative w-10 h-10 rounded-full overflow-hidden p-0.5 border border-[#441619] group-hover:border-[#ea3838] transition-all group-hover:scale-105">
               <img
-                src={c.avatar}
+                src={c.avatar?.trim() || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80'}
                 alt={c.name}
                 className="w-full h-full object-cover rounded-full"
               />

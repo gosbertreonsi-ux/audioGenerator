@@ -1119,7 +1119,7 @@ export const VizmotionAIEditor: React.FC<VizmotionAIEditorProps> = ({
               >
                 {/* Media Thumbnail */}
                 <div className="w-12 h-12 rounded-lg bg-[#280e10] overflow-hidden shrink-0 relative flex items-center justify-center border border-[#3a1517]">
-                  {item.thumbnail ? (
+                  {item.thumbnail && item.thumbnail.trim() !== '' ? (
                     <img src={item.thumbnail} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                   ) : (
                     <Film className="w-5 h-5 text-neutral-500" />

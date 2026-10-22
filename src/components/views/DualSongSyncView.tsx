@@ -164,16 +164,23 @@ const DualBeatOscilloscope: React.FC<{
 interface DualSongSyncViewProps {
   currentTrack?: AudioTrack;
   onOpenQuickUpload?: () => void;
+  onOpenStudio?: () => void;
+  onSendToStudio?: (track: AudioTrack) => void;
 }
 
 export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
   currentTrack,
   onOpenQuickUpload,
+  onOpenStudio,
+  onSendToStudio,
 }) => {
   const [engineState, setEngineState] = useState<DualEngineState>(globalDualAudioEngine.getState());
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+  const [isLoadingAltare, setIsLoadingAltare] = useState(false);
+  const [autoPreview, setAutoPreview] = useState(true);
+  const [isSendingToStudio, setIsSendingToStudio] = useState(false);
   const [isDraggingJoint, setIsDraggingJoint] = useState(false);
   const [isDraggingA, setIsDraggingA] = useState(false);
   const [isDraggingB, setIsDraggingB] = useState(false);
@@ -199,6 +206,10 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
     if (!file) return;
     try {
       await globalDualAudioEngine.loadTrackA(file);
+      const st = globalDualAudioEngine.getState();
+      if (st.trackB && autoPreview) {
+        await globalDualAudioEngine.play();
+      }
     } catch (err) {
       console.error('Failed to load track A:', err);
     }
@@ -210,6 +221,10 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
     if (!file) return;
     try {
       await globalDualAudioEngine.loadTrackB(file);
+      const st = globalDualAudioEngine.getState();
+      if (st.trackA && autoPreview) {
+        await globalDualAudioEngine.play();
+      }
     } catch (err) {
       console.error('Failed to load track B:', err);
     }
@@ -220,27 +235,58 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
     if (!files || files.length === 0) return;
     try {
       if (files.length === 1) {
-        if (!trackA) await globalDualAudioEngine.loadTrackA(files[0]);
-        else await globalDualAudioEngine.loadTrackB(files[0]);
+        const st = globalDualAudioEngine.getState();
+        if (!st.trackA) {
+          await globalDualAudioEngine.loadTrackA(files[0]);
+          if (globalDualAudioEngine.getState().trackB && autoPreview) {
+            await globalDualAudioEngine.play();
+          }
+        } else {
+          await globalDualAudioEngine.loadTrackB(files[0]);
+          if (autoPreview) {
+            await globalDualAudioEngine.play();
+          }
+        }
       } else {
         await globalDualAudioEngine.loadTrackA(files[0]);
         await globalDualAudioEngine.loadTrackB(files[1]);
+        if (autoPreview) {
+          await globalDualAudioEngine.play();
+        }
       }
     } catch (err) {
       console.error('Failed to load dual tracks:', err);
     }
   };
 
-  // Handle loading demo song pair (116 BPM & 144 BPM)
+  // Handle loading Ariana "bye" x Altare Future Bass / Trap Flip demo pair
+  const handleLoadArianaAltareDemoPair = async () => {
+    try {
+      setIsLoadingAltare(true);
+      await globalDualAudioEngine.loadArianaAltareByeDemoPair();
+    } catch (err) {
+      console.error('Failed to load Ariana Altare demo pair:', err);
+    } finally {
+      setIsLoadingAltare(false);
+    }
+  };
+
+  // Handle loading synthwave demo song pair (116 BPM & 144 BPM)
   const handleLoadDemoPair = async () => {
     try {
       setIsLoadingDemo(true);
       await globalDualAudioEngine.loadDemoPair();
+      if (autoPreview) await globalDualAudioEngine.play();
     } catch (err) {
       console.error('Failed to load demo pair:', err);
     } finally {
       setIsLoadingDemo(false);
     }
+  };
+
+  // 1-click apply Altare "bye" production configuration
+  const handleApplyAltarePreset = () => {
+    globalDualAudioEngine.applyAltareArianaByePreset();
   };
 
   // Quick load currently active single-track from globalAudioEngine into Track A
@@ -279,6 +325,78 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
     }
   };
 
+  // Transfer synchronized dual mix into Studio Engine for deep edits & download
+  const handleSendMixToStudio = async () => {
+    if (!trackA && !trackB) return;
+    try {
+      setIsSendingToStudio(true);
+      globalDualAudioEngine.pause();
+      const renderedBuffer = await globalDualAudioEngine.renderDualBuffer();
+      await globalAudioEngine.loadAudioBuffer(renderedBuffer);
+
+      const titleA = trackA?.name || 'Song A';
+      const titleB = trackB?.name || 'Song B';
+      const mashupTrack: AudioTrack = {
+        id: `mashup_${Date.now()}`,
+        title: `${titleA} x ${titleB} (Beat-Synced Mix)`,
+        artist: 'Dual Engine Mashup',
+        duration: Math.round(renderedBuffer.duration),
+        bpm: config.targetBpm,
+        key: 'Multi-Key',
+        energy: 'High',
+        vocals: 'Detected',
+        lufs: -14,
+        genre: 'Beat Sync Mashup',
+        coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+        sourceType: 'user_upload',
+      };
+
+      if (onSendToStudio) {
+        onSendToStudio(mashupTrack);
+      } else if (onOpenStudio) {
+        onOpenStudio();
+      }
+    } catch (err) {
+      console.error('Failed to send mix to studio:', err);
+    } finally {
+      setIsSendingToStudio(false);
+    }
+  };
+
+  // Transfer single track (Song A or Song B) into Studio Engine for deep edits & download
+  const handleSendTrackToStudio = async (slot: 'a' | 'b') => {
+    const track = slot === 'a' ? trackA : trackB;
+    if (!track || !track.buffer) return;
+    try {
+      setIsSendingToStudio(true);
+      globalDualAudioEngine.pause();
+      await globalAudioEngine.loadAudioBuffer(track.buffer);
+      const newTrack: AudioTrack = {
+        id: `slot_${slot}_${Date.now()}`,
+        title: track.name,
+        artist: track.artist || (slot === 'a' ? 'Song A' : 'Song B'),
+        duration: Math.round(track.buffer.duration),
+        bpm: track.nativeBpm || 120,
+        key: '--',
+        energy: 'Medium',
+        vocals: track.stemMode === 'beat_only' ? 'Instrumental Only' : 'Detected',
+        lufs: -14,
+        genre: 'Studio Master',
+        coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+        sourceType: 'user_upload',
+      };
+      if (onSendToStudio) {
+        onSendToStudio(newTrack);
+      } else if (onOpenStudio) {
+        onOpenStudio();
+      }
+    } catch (err) {
+      console.error(`Failed to send track ${slot} to studio:`, err);
+    } finally {
+      setIsSendingToStudio(false);
+    }
+  };
+
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
@@ -313,24 +431,38 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
         </div>
 
         {/* Global Action Buttons */}
-        <div className="relative z-10 flex flex-wrap items-center gap-3">
+        <div className="relative z-10 flex flex-wrap items-center gap-2.5">
           <button
-            onClick={handleLoadDemoPair}
-            disabled={isLoadingDemo}
-            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#2b1013] hover:bg-[#3d1519] border border-[#5a1c22] hover:border-[#ea3838] text-white text-xs font-black shadow-lg transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
-            title="Load two demo tracks (116 BPM & 144 BPM) to immediately test beat sync and compression"
+            onClick={handleLoadArianaAltareDemoPair}
+            disabled={isLoadingAltare}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-[#ea3838] via-[#ff3b47] to-amber-500 hover:brightness-110 text-white text-xs font-black shadow-lg shadow-[#ea3838]/40 transition-all active:scale-95 disabled:opacity-40 cursor-pointer border border-amber-300/40"
+            title="Load Ariana Grande - bye (Vocals) x Altare (145 BPM Wave/Trap Drop) with instant simultaneous preview"
           >
-            {isLoadingDemo ? (
+            {isLoadingAltare ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-[#ff6b72]" />
-                <span>Synthesizing Demo Pair...</span>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Loading Ariana 'bye' Flip...</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Load Demo 2-Song Pair</span>
+                <Zap className="w-4 h-4 text-white fill-current animate-pulse" />
+                <span>Load Ariana 'bye' (Altare Flip)</span>
               </>
             )}
+          </button>
+
+          <button
+            onClick={handleLoadDemoPair}
+            disabled={isLoadingDemo}
+            className="flex items-center gap-1.5 px-3.5 py-3 rounded-2xl bg-[#2b1013] hover:bg-[#3d1519] border border-[#5a1c22] hover:border-[#ea3838] text-[#d4abb0] hover:text-white text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+            title="Load two demo tracks (116 BPM & 144 BPM) to test beat sync and compression"
+          >
+            {isLoadingDemo ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[#ff6b72]" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span>Synthwave Demo</span>
           </button>
 
           <button
@@ -351,6 +483,25 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
               <>
                 <Play className="w-4 h-4 fill-current" />
                 <span>PLAY BEAT-SYNCED</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleSendMixToStudio}
+            disabled={(!trackA && !trackB) || isSendingToStudio}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#ea3838] to-[#ff3b47] hover:brightness-110 text-white text-xs font-black shadow-lg shadow-[#ea3838]/30 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+            title="Transfer synchronized 2-song audio into Studio Engine to apply 8D audio, slowed reverb, bass boost, and download"
+          >
+            {isSendingToStudio ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Preparing Studio Engine...</span>
+              </>
+            ) : (
+              <>
+                <Sliders className="w-4 h-4 text-white" />
+                <span>Edit in Studio Engine & Download</span>
               </>
             )}
           </button>
@@ -546,6 +697,215 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
         </div>
       </div>
 
+      {/* =========================================================================
+          SIMULTANEOUS DUAL PREVIEW & ALTARE 'BYE' COMPRESSION MASTER STATION
+         ========================================================================= */}
+      {trackA && trackB ? (
+        <div className="p-6 rounded-3xl bg-gradient-to-r from-[#240a0e] via-[#330f14] to-[#1c0709] border-2 border-[#ea3838] shadow-[0_0_60px_rgba(234,56,56,0.3)] space-y-5 animate-fade-in relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#ea3838]/15 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Header Row */}
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#4d161b] pb-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#ea3838] text-white text-[11px] font-black uppercase tracking-wider shadow-md shadow-[#ea3838]/40 animate-pulse">
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  SIMULTANEOUS DUAL PREVIEW ACTIVE
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-[#1b080a] text-emerald-400 border border-emerald-500/40 text-[10px] font-mono font-bold">
+                  PHASE LOCKED: {(config.targetBpm / 60).toFixed(3)} Hz ({config.targetBpm} BPM)
+                </span>
+              </div>
+              <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+                <span className="text-[#ff6b72] truncate max-w-[260px]">{trackA.name}</span>
+                <span className="text-[#a67c7f] text-sm">×</span>
+                <span className="text-[#06b6d4] truncate max-w-[260px]">{trackB.name}</span>
+              </h2>
+              <p className="text-xs text-[#cfa8ab]">
+                Both songs preview simultaneously with dynamic beat-matching, bus compression, and sidechain pumping.
+              </p>
+            </div>
+
+            {/* Quick Actions in Header */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1b0709] border border-[#3f1418] text-xs text-[#d4abb0] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoPreview}
+                  onChange={(e) => setAutoPreview(e.target.checked)}
+                  className="rounded accent-[#ea3838] cursor-pointer"
+                />
+                <span>Auto-play on select</span>
+              </label>
+
+              <button
+                onClick={handleApplyAltarePreset}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-[#ea3838] to-[#ff3b47] hover:brightness-110 text-white text-xs font-black shadow-lg shadow-[#ea3838]/30 transition-all active:scale-95 cursor-pointer border border-amber-300/40"
+                title="Isolate Ariana vocals on Song A, 808 drop on Song B, lock 145 BPM, sidechain ducking & glue compression"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Apply Altare 'bye' Style (145 BPM Flip)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Primary Preview Player Bar */}
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-[#150608]/80 p-4 rounded-2xl border border-[#3d1317]">
+            {/* Giant Play/Pause preview button */}
+            <div className="md:col-span-5 flex items-center gap-2.5">
+              <button
+                onClick={() => globalDualAudioEngine.togglePlay()}
+                className={`flex-1 flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl font-black text-xs sm:text-sm tracking-wide shadow-2xl transition-all cursor-pointer ${
+                  isPlaying
+                    ? 'bg-[#290d10] text-[#ff6b72] border-2 border-[#ea3838] hover:bg-[#3d1317]'
+                    : 'bg-gradient-to-r from-[#ea3838] via-[#ff3b47] to-[#ff5c5c] text-white hover:brightness-110 shadow-lg shadow-[#ea3838]/40 scale-[1.02]'
+                }`}
+              >
+                {isPlaying ? (
+                  <>
+                    <Pause className="w-5 h-5 fill-current" />
+                    <span>PAUSE DUAL PREVIEW</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5 fill-current animate-pulse" />
+                    <span>PLAY BOTH SONGS TOGETHER</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={() => globalDualAudioEngine.seek(0)}
+                className="p-3.5 rounded-2xl bg-[#200b0e] hover:bg-[#311115] border border-[#3e1418] text-[#a67c7f] hover:text-white transition-all cursor-pointer"
+                title="Restart preview from 0:00"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Time progress bar */}
+            <div className="md:col-span-4 space-y-1.5">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-mono text-[#ff6b72] font-bold">{formatTime(currentTime)}</span>
+                <span className="text-[10px] text-[#a67c7f] uppercase font-bold tracking-wider">
+                  {isPlaying ? 'Live Quantized Preview' : 'Preview Paused'}
+                </span>
+                <span className="font-mono text-[#a67c7f]">{formatTime(duration)}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max={duration || 100}
+                step="0.1"
+                value={currentTime}
+                onChange={(e) => globalDualAudioEngine.seek(parseFloat(e.target.value))}
+                className="w-full h-2 bg-[#200a0d] rounded-lg accent-[#ea3838] cursor-pointer"
+              />
+            </div>
+
+            {/* Crossfader control */}
+            <div className="md:col-span-3 space-y-1">
+              <div className="flex justify-between text-[11px] font-bold">
+                <span className="text-[#ff6b72]">Song A ({Math.round((1 - config.crossfader) * 100)}%)</span>
+                <span className="text-[#06b6d4]">Song B ({Math.round(config.crossfader * 100)}%)</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={config.crossfader}
+                onChange={(e) => globalDualAudioEngine.setCrossfader(parseFloat(e.target.value))}
+                className="w-full h-2 bg-[#200a0d] rounded-lg accent-[#ff6b72] cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Master Download Action Strip */}
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#d4abb0] font-medium">Chain:</span>
+              <span className="px-2 py-0.5 rounded-lg bg-[#220a0d] border border-[#3e1418] text-[10px] font-mono text-white font-bold">
+                {config.targetBpm} BPM
+              </span>
+              <span className="px-2 py-0.5 rounded-lg bg-[#220a0d] border border-[#3e1418] text-[10px] font-mono text-[#ff7b82] font-bold">
+                Sidechain: {config.sidechainSource !== 'none' ? `${Math.round(config.sidechainDepth * 100)}% Ducking` : 'Off'}
+              </span>
+              <span className="px-2 py-0.5 rounded-lg bg-[#220a0d] border border-[#3e1418] text-[10px] font-mono text-amber-400 font-bold">
+                Glue: {config.glueThreshold} dB (Ratio {config.glueRatio}:1)
+              </span>
+              <span className="px-2 py-0.5 rounded-lg bg-[#220a0d] border border-[#3e1418] text-[10px] font-mono text-emerald-400 font-bold">
+                Limiter: -9 LUFS
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+              <button
+                onClick={handleExportWAV}
+                disabled={isExporting}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-black text-xs font-black shadow-lg shadow-emerald-500/30 transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                    <span>Rendering Compressed WAV...</span>
+                  </>
+                ) : exportComplete ? (
+                  <>
+                    <Check className="w-4 h-4 text-black" />
+                    <span>Downloaded Compressed Master!</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 text-black" />
+                    <span>Download Compressed Master (WAV)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleSendMixToStudio}
+                disabled={isSendingToStudio}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#280c10] hover:bg-[#381216] border border-[#4d191d] hover:border-[#ea3838] text-white text-xs font-black shadow-md transition-all active:scale-95 cursor-pointer"
+                title="Open this dual mix in Studio Engine for 8D audio, slowed reverb, and vocal chains"
+              >
+                <Sliders className="w-4 h-4 text-[#ff6b72]" />
+                <span>Open in Studio Engine</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="p-5 rounded-2xl bg-[#1b080b]/80 border border-[#361316] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#280d10] border border-[#44161a] flex items-center justify-center text-amber-400 shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white">
+                {trackA ? 'Now select or upload Song B to preview both together' : trackB ? 'Now select or upload Song A to preview both together' : 'Select 2 songs to preview simultaneously & download compressed master'}
+              </h4>
+              <p className="text-xs text-[#a67c7f] mt-0.5">
+                Drop two files above or load the Ariana Grande - bye (Altare Flip) demo pair to test instantly.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleLoadArianaAltareDemoPair}
+            disabled={isLoadingAltare}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#ea3838] to-[#ff4747] hover:brightness-110 text-white text-xs font-black shadow-md transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            {isLoadingAltare ? (
+              <Loader2 className="w-4 h-4 animate-spin text-white" />
+            ) : (
+              <Zap className="w-4 h-4 fill-current text-white" />
+            )}
+            <span>Load Ariana 'bye' (Altare Flip) Demo</span>
+          </button>
+        </div>
+      )}
+
       {/* DUAL TRACK DECKS: SONG A vs SONG B */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ========================================== */}
@@ -568,13 +928,24 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
             </div>
 
             {trackA && (
-              <button
-                onClick={() => globalDualAudioEngine.removeTrack('a')}
-                className="p-1.5 rounded-lg bg-[#270e11] hover:bg-[#3d1418] text-[#a67c7f] hover:text-white transition-all"
-                title="Remove Song A"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleSendTrackToStudio('a')}
+                  disabled={isSendingToStudio}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2b0e12] hover:bg-[#3d1318] text-[#ff7b82] hover:text-white border border-[#4d191d] text-[11px] font-bold transition-all cursor-pointer"
+                  title="Send Song A to Studio Engine to edit & download"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Edit in Studio</span>
+                </button>
+                <button
+                  onClick={() => globalDualAudioEngine.removeTrack('a')}
+                  className="p-1.5 rounded-lg bg-[#270e11] hover:bg-[#3d1418] text-[#a67c7f] hover:text-white transition-all cursor-pointer"
+                  title="Remove Song A"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </div>
 
@@ -583,11 +954,17 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
             <div 
               onDragOver={(e) => { e.preventDefault(); setIsDraggingA(true); }}
               onDragLeave={() => setIsDraggingA(false)}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 e.preventDefault();
                 setIsDraggingA(false);
                 const file = e.dataTransfer.files?.[0];
-                if (file) globalDualAudioEngine.loadTrackA(file);
+                if (file) {
+                  await globalDualAudioEngine.loadTrackA(file);
+                  const st = globalDualAudioEngine.getState();
+                  if (st.trackB && autoPreview) {
+                    await globalDualAudioEngine.play();
+                  }
+                }
               }}
               className={`p-6 rounded-2xl border-2 border-dashed transition-all text-center space-y-3 ${
                 isDraggingA
@@ -740,13 +1117,24 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
             </div>
 
             {trackB && (
-              <button
-                onClick={() => globalDualAudioEngine.removeTrack('b')}
-                className="p-1.5 rounded-lg bg-[#270e11] hover:bg-[#3d1418] text-[#a67c7f] hover:text-white transition-all"
-                title="Remove Song B"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleSendTrackToStudio('b')}
+                  disabled={isSendingToStudio}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0c242c] hover:bg-[#123642] text-[#06b6d4] hover:text-white border border-[#164e63] text-[11px] font-bold transition-all cursor-pointer"
+                  title="Send Song B to Studio Engine to edit & download"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Edit in Studio</span>
+                </button>
+                <button
+                  onClick={() => globalDualAudioEngine.removeTrack('b')}
+                  className="p-1.5 rounded-lg bg-[#270e11] hover:bg-[#3d1418] text-[#a67c7f] hover:text-white transition-all cursor-pointer"
+                  title="Remove Song B"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             )}
           </div>
 
@@ -755,11 +1143,17 @@ export const DualSongSyncView: React.FC<DualSongSyncViewProps> = ({
             <div 
               onDragOver={(e) => { e.preventDefault(); setIsDraggingB(true); }}
               onDragLeave={() => setIsDraggingB(false)}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 e.preventDefault();
                 setIsDraggingB(false);
                 const file = e.dataTransfer.files?.[0];
-                if (file) globalDualAudioEngine.loadTrackB(file);
+                if (file) {
+                  await globalDualAudioEngine.loadTrackB(file);
+                  const st = globalDualAudioEngine.getState();
+                  if (st.trackA && autoPreview) {
+                    await globalDualAudioEngine.play();
+                  }
+                }
               }}
               className={`p-6 rounded-2xl border-2 border-dashed transition-all text-center space-y-3 ${
                 isDraggingB

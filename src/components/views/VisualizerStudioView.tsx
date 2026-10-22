@@ -186,7 +186,7 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
     {
       id: 'album_cover',
       name: 'Current Track Album Art',
-      url: currentTrack.coverUrl,
+      url: currentTrack.coverUrl?.trim() || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1920&q=80',
     },
   ];
 
@@ -941,7 +941,7 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
                           : 'bg-[#1f0a0d] border-[#371518] text-[#a67c7f] hover:text-white'
                       }`}
                     >
-                      {bg.url ? (
+                      {bg.url && bg.url.trim() !== '' ? (
                         <img src={bg.url} alt={bg.name} className="w-8 h-8 rounded-lg object-cover" />
                       ) : (
                         <div className="w-8 h-8 rounded-lg bg-[#2a0d10]" />
@@ -1224,12 +1224,14 @@ export const VisualizerStudioView: React.FC<VisualizerStudioViewProps> = ({
 
             {/* Video Player */}
             <div className="overflow-hidden rounded-2xl bg-black border border-[#3b1517] shadow-xl">
-              <video
-                src={recordedVideoUrl}
-                controls
-                autoPlay
-                className="w-full max-h-[360px] object-contain"
-              />
+              {recordedVideoUrl && recordedVideoUrl.trim() !== '' ? (
+                <video
+                  src={recordedVideoUrl}
+                  controls
+                  autoPlay
+                  className="w-full max-h-[360px] object-contain"
+                />
+              ) : null}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">

@@ -539,7 +539,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Artwork thumbnail with Red Dead style mark */}
             <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-[#441619] shrink-0">
               <img
-                src={currentTrack.coverUrl || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80'}
+                src={currentTrack.coverUrl?.trim() || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80'}
                 alt={currentTrack.title}
                 className="w-full h-full object-cover"
               />

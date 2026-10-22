@@ -1784,6 +1784,35 @@ export class MusicAudioEngine {
     beatG.connect(stemMixer);
     vocalG.connect(stemMixer);
 
+    // Mix Secondary Track (Song 2) into offline stemMixer
+    let offlineSec: AudioBufferSourceNode | null = null;
+    if (this.secondaryBuffer) {
+      const secBuf = this.secondaryStemMode === 'beat_only' && this.secondaryBeatBuffer
+        ? this.secondaryBeatBuffer
+        : this.secondaryStemMode === 'words_only' && this.secondaryVocalBuffer
+        ? this.secondaryVocalBuffer
+        : this.secondaryBuffer;
+
+      offlineSec = offlineCtx.createBufferSource();
+      offlineSec.buffer = secBuf;
+      offlineSec.loop = true;
+
+      const primaryBpm = this.detectBpm(this.currentBuffer);
+      const secMultiplier = (this.secondaryBeatLock && this.secondaryNativeBpm > 0 && primaryBpm > 0)
+        ? (primaryBpm / this.secondaryNativeBpm)
+        : 1.0;
+      offlineSec.playbackRate.value = Math.max(0.3, Math.min(2.5, effectiveRate * secMultiplier));
+
+      const secG = offlineCtx.createGain();
+      secG.gain.value = this.secondaryVolume;
+
+      offlineSec.connect(secG);
+      secG.connect(stemMixer);
+
+      const secOffset = Math.max(0, this.secondaryOffsetSec);
+      offlineSec.start(0, secOffset);
+    }
+
     // Effects chain (identical to real-time playback)
     const bass = offlineCtx.createBiquadFilter();
     bass.type = 'lowshelf';

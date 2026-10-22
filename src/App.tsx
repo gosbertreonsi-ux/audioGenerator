@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NavigationDock, NavTab } from './components/NavigationDock';
 import { HeaderBar } from './components/HeaderBar';
 import { CollaboratorsRail } from './components/CollaboratorsRail';
@@ -16,6 +16,8 @@ import { RightsCenterView } from './components/views/RightsCenterView';
 import { PublishingView } from './components/views/PublishingView';
 import { VizmotionAIEditor } from './components/views/VizmotionAIEditor';
 import { DualSongSyncView } from './components/views/DualSongSyncView';
+import { MiziziUtilitiesView } from './components/views/MiziziUtilitiesView';
+import { LyricSyncStudioView } from './components/views/LyricSyncStudioView';
 import { QuickUploadModal } from './components/QuickUploadModal';
 import { VocalModelsModal } from './components/VocalModelsModal';
 import { VocalChainInspectorModal } from './components/VocalChainInspectorModal';
@@ -26,7 +28,8 @@ import { AudioTrack, TransformationPreset, VocalModel } from './types';
 import { globalAudioEngine } from './lib/audioEngine';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('vizmotion');
+  const [activeTab, setActiveTab] = useState<NavTab>('utilities');
+  const [language, setLanguage] = useState<'EN' | 'SW'>('EN');
   const [currentTrack, setCurrentTrack] = useState<AudioTrack>(DEFAULT_UNLOADED_TRACK);
   const [activePreset, setActivePreset] = useState<TransformationPreset>(PRESET_STYLES[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,23 +80,45 @@ export default function App() {
 
         {/* Center Main Stage */}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-          {/* Header Bar - Shown on non-editor tabs */}
-          {activeTab !== 'vizmotion' && (
-            <HeaderBar
-              userName={userName}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onOpenExportsModal={() => setActiveTab('publish')}
-              onOpenVocalModels={() => setIsVocalModelsOpen(true)}
-              onOpenProfileModal={() => {
-                const name = prompt('Enter your producer/artist name:', userName);
-                if (name && name.trim()) setUserName(name.trim());
-              }}
-            />
-          )}
+          {/* Header Bar - Shown across tabs for unified identity */}
+          <HeaderBar
+            userName={userName}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpenExportsModal={() => setActiveTab('publish')}
+            onOpenVocalModels={() => setIsVocalModelsOpen(true)}
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            language={language}
+            onToggleLanguage={() => setLanguage((l) => (l === 'EN' ? 'SW' : 'EN'))}
+            onOpenProfileModal={() => {
+              const name = prompt('Enter your producer/artist name:', userName);
+              if (name && name.trim()) setUserName(name.trim());
+            }}
+          />
 
           {/* Active View Switcher */}
           <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* VERSION A: MIZIZI UTILITIES (123apps style single purpose tools) */}
+            {activeTab === 'utilities' && (
+              <MiziziUtilitiesView
+                onSendToStudio={(track) => {
+                  setCurrentTrack(track);
+                  setActiveTab('studio');
+                }}
+                onOpenCreativeStudio={(tabId) => setActiveTab((tabId as NavTab) || 'vizmotion')}
+              />
+            )}
+
+            {/* VERSION B: MIZIZI CREATIVE STUDIO - LYRIC & MUSIC ALIGNMENT STUDIO */}
+            {activeTab === 'lyricsync' && (
+              <LyricSyncStudioView
+                currentTrack={currentTrack}
+                onNavigateTab={(tab) => setActiveTab(tab as NavTab)}
+              />
+            )}
+
+            {/* VERSION B: MIZIZI CREATIVE STUDIO - VIZMOTION MULTITRACK VIDEO NLE */}
             {activeTab === 'vizmotion' && (
               <VizmotionAIEditor
                 currentTrack={currentTrack}
@@ -138,6 +163,11 @@ export default function App() {
               <DualSongSyncView
                 currentTrack={currentTrack}
                 onOpenQuickUpload={() => setIsQuickUploadOpen(true)}
+                onOpenStudio={() => setActiveTab('studio')}
+                onSendToStudio={(track) => {
+                  setCurrentTrack(track);
+                  setActiveTab('studio');
+                }}
               />
             )}
 
@@ -184,8 +214,8 @@ export default function App() {
           </main>
         </div>
 
-        {/* Right Collaborators Studio Rail - Shown only on dashboard/studio */}
-        {activeTab !== 'vizmotion' && (
+        {/* Right Collaborators Studio Rail - Shown on dashboard/studio */}
+        {(activeTab === 'dashboard' || activeTab === 'studio') && (
           <CollaboratorsRail
             collaborators={COMMUNITY_CREATORS}
             onSelectCollaborator={(c) => {
@@ -213,44 +243,37 @@ export default function App() {
         onClose={() => setIsVocalModelsOpen(false)}
         onSelectVocalModel={handleSelectVocalModel}
         onInspectChain={(model) => setInspectedVocalModel(model)}
-        currentActiveModelId={activeVocalModel?.id}
       />
 
-      {/* Hardware Chain Inspector Modal */}
+      {/* Vocal Chain Inspector Modal */}
       <VocalChainInspectorModal
         model={inspectedVocalModel}
-        isOpen={Boolean(inspectedVocalModel)}
+        isOpen={!!inspectedVocalModel}
         onClose={() => setInspectedVocalModel(null)}
-        onApplyModel={handleSelectVocalModel}
+        onApplyModel={(model) => {
+          handleSelectVocalModel(model);
+          setInspectedVocalModel(null);
+        }}
       />
 
-      {/* Instrumental Swapper & Acapella Isolator Modal (African Remix Suite) */}
+      {/* Afrobeat Remixer & Instrumental Swapper Modal */}
       <InstrumentalSwapperModal
         isOpen={isInstrumentalSwapperOpen}
         onClose={() => setIsInstrumentalSwapperOpen(false)}
         currentTrack={currentTrack}
-        onSelectTrack={(track) => {
-          setCurrentTrack(track);
-          setActiveTab('studio');
+        onSelectTrack={setCurrentTrack}
+        onApplyPreset={(p) => {
+          setActivePreset(p);
+          globalAudioEngine.setTransformation(p);
         }}
-        onApplyPreset={(preset) => {
-          setActivePreset(preset);
-          globalAudioEngine.setTransformation(preset);
-        }}
-        onOpenVideoStudio={() => {
-          setIsInstrumentalSwapperOpen(false);
-          setActiveTab('vizmotion');
-        }}
+        onOpenVideoStudio={() => setActiveTab('vizmotion')}
       />
 
-      {/* 16-Step Beat Maker & Drum Machine Modal */}
+      {/* African Beat Maker & Drum Machine Studio Modal */}
       <BeatMakerStudioModal
         isOpen={isBeatMakerOpen}
         onClose={() => setIsBeatMakerOpen(false)}
-        onSendBeatToEngine={() => {
-          setIsBeatMakerOpen(false);
-          setActiveTab('studio');
-        }}
+        onSendBeatToEngine={() => setActiveTab('studio')}
       />
     </div>
   );
